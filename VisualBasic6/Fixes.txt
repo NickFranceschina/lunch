@@ -1,0 +1,46 @@
+Want to belong to multiple groups - at the moment, you can only belong to one group at a time.
+
+i |Error - if you go to the log-in prompt and just type "add" and hit enter, the program errors.
+
+i |Possible Error - what if two people try to add the same restaurant at the same time?
+
+i |If you are in the "Default Group", you shouldn't be able to remove restaurants - only add.
+
+i |If no one is in a group... a restaurant shouldn't be picked for it.
+	-- select groupid from groups where groupid in (select a.groupid from users a)
+
+Can we use apostrophe's??
+
+i |on confirmation... VoteYes and VoteNo should be disabled
+
+i |all newly added restaurants should go into 'Default' group automatically.
+
+i |Change Default to 'All' 
+
+i |Show all users that belong to a group (right click... doubleclick)
+--- c |Show Group Title at top of message box, and show (no users found) if there are 
+	no users in that group (currently shows 'QL Error')
+
+refresh button on each panel?  (small icon)
+
+i |Disable popup feature (in .ini file and checkbox on the panel)
+
+i |add Telnet Functionality
+
+Remove IPAddress from view - set in INI file?
+
+i |"shutdown server?" message box on unload of server
+
+Add a chat box!
+
+it|Use more popup-menu's (right click on user to "Send Message to User, Chat with User"
+		       right click on group to "Send Message to Group, set up group chat,
+		       Show users in group, join group)
+
+Get Popup Menus to call 'click event'
+
+PUT PASSWORD PROTECT on DML SQL statements (protect against Telnetting)
+
+it|Put in a help menu in Telnet
+
+it|Don't force Users to Log out... log out for them

@@ -1,0 +1,17 @@
+[Your Information and Preferences]
+UserName: lunchmaster
+LoginNotify: FALSE
+rem NoPopup
+rem NoChatAccept
+
+
+[Server Location Parameters]
+Server: 127.0.0.1 6001
+
+
+[Server Parameters ---- Use these if you are running the server]
+ListenPort: 6001
+OftenMark: 65
+SeldomMark: 90
+ConfirmationWait: 1
+
