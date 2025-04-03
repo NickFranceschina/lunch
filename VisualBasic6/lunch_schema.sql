@@ -8,38 +8,38 @@
 
 -- That file uses encoding UTF-8
 
-CREATE TABLE `Users`
+CREATE TABLE Users
  (
-	`IPAddress`			varchar (15), 
-	`UserName`			varchar (20), 
-	`GroupID`			varchar (20), 
-	`LoggedOn`			boolean NOT NULL, 
-	`Port`			int
+	IPAddress			varchar (15), 
+	UserName			varchar (20), 
+	GroupID			varchar (20), 
+	LoggedOn			boolean NOT NULL, 
+	Port			int
 );
 
 -- CREATE INDEXES ...
-ALTER TABLE `Users` ADD PRIMARY KEY (`UserName`);
+ALTER TABLE Users ADD PRIMARY KEY (UserName);
 
-CREATE TABLE `Groups`
+CREATE TABLE Groups
  (
-	`CurrentRestaurantChoice`			varchar (30), 
-	`CurrentYesVotes`			int, 
-	`CurrentNoVotes`			int, 
-	`GroupID`			varchar (20), 
-	`NotificationTime`			datetime, 
-	`Confirmed`			boolean NOT NULL, 
-	`ConfirmationTime`			datetime
+	CurrentRestaurantChoice			varchar (30), 
+	CurrentYesVotes			int, 
+	CurrentNoVotes			int, 
+	GroupID			varchar (20), 
+	NotificationTime			datetime, 
+	Confirmed			boolean NOT NULL, 
+	ConfirmationTime			datetime
 );
 
 -- CREATE INDEXES ...
-ALTER TABLE `Groups` ADD PRIMARY KEY (`GroupID`);
+ALTER TABLE Groups ADD PRIMARY KEY (GroupID);
 
-CREATE TABLE `Restaurants`
+CREATE TABLE Restaurants
  (
-	`GroupID`			varchar (20), 
-	`RestaurantName`			varchar (30), 
-	`GroupRating`			varchar (50), 
-	`Chosen`			boolean NOT NULL
+	GroupID			varchar (20), 
+	RestaurantName			varchar (30), 
+	GroupRating			varchar (50), 
+	Chosen			boolean NOT NULL
 );
 
 -- CREATE INDEXES ...

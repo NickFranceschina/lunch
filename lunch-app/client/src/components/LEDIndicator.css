@@ -1,0 +1,27 @@
+.led-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.led-label {
+  color: #E0E0E0;
+  font-size: 14px;
+}
+
+.led {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.led-red {
+  background-color: #FF0000;
+  box-shadow: 0 0 5px #FF0000;
+}
+
+.led-green {
+  background-color: #00FF00;
+  box-shadow: 0 0 5px #00FF00;
+} 

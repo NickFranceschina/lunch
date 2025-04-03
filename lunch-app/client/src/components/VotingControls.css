@@ -1,0 +1,24 @@
+.voting-controls {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.vote-button {
+  padding: 5px 10px;
+  width: 100px;
+  background-color: #E0E0E0;
+  border: 1px solid #808080;
+  color: #000000;
+  cursor: pointer;
+}
+
+.vote-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vote-button:hover:not(:disabled) {
+  background-color: #FFFFFF;
+} 
