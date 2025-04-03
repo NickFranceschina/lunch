@@ -5,10 +5,11 @@ import { Restaurant } from "../models/Restaurant";
 import { GroupRestaurant } from "../models/GroupRestaurant";
 import { Chat } from "../models/Chat";
 import { Setting } from "../models/Setting";
+import * as path from "path";
 
 export const AppDataSource = new DataSource({
     type: "sqlite",
-    database: "lunch.db",
+    database: path.join(__dirname, "..", "..", "lunch.db"),
     synchronize: true, // Set to false in production
     logging: true,
     entities: [User, Group, Restaurant, GroupRestaurant, Chat, Setting],
