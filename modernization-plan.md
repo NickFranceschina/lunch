@@ -1,7 +1,7 @@
 # Lunch Application Modernization Plan
 
 ## Overview
-This document outlines the plan to convert the legacy VB6 lunch application to a modern TypeScript-based architecture. The plan focuses on maintaining the core functionality and visual appearance while modernizing the technology stack.
+This document outlines the plan to convert the legacy client/server VB6 lunch application in the `VisualBasic6/` folder to a modern TypeScript-based architecture. The plan focuses on maintaining the core functionality and visual appearance while modernizing the technology stack.
 
 ## Architecture Components
 
