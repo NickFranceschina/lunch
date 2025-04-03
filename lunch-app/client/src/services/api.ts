@@ -1,9 +1,9 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001';
 
 // Auth service
 export const authService = {
   login: async (username: string, password: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -18,12 +18,18 @@ export const authService = {
     return response.json();
   },
   
-  logout: async () => {
-    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+  logout: async (token?: string) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
     
     if (!response.ok) {
@@ -36,11 +42,12 @@ export const authService = {
 
 // Restaurant service
 export const restaurantService = {
-  getRandomRestaurant: async (groupId: number) => {
-    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/random-restaurant`, {
+  getRandomRestaurant: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/random`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
     });
     
@@ -51,11 +58,12 @@ export const restaurantService = {
     return response.json();
   },
   
-  voteYes: async (groupId: number) => {
-    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/vote`, {
+  voteYes: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/vote`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ vote: 'yes' }),
     });
@@ -67,17 +75,84 @@ export const restaurantService = {
     return response.json();
   },
   
-  voteNo: async (groupId: number) => {
-    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/vote`, {
+  voteNo: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/vote`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ vote: 'no' }),
     });
     
     if (!response.ok) {
       throw new Error('Failed to vote no');
+    }
+    
+    return response.json();
+  },
+  
+  getAllRestaurants: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get restaurants');
+    }
+    
+    return response.json();
+  },
+  
+  createRestaurant: async (data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to create restaurant');
+    }
+    
+    return response.json();
+  },
+  
+  updateRestaurant: async (id: number, data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update restaurant');
+    }
+    
+    return response.json();
+  },
+  
+  deleteRestaurant: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete restaurant');
     }
     
     return response.json();

@@ -3,6 +3,7 @@ import LEDIndicator from './LEDIndicator';
 import RestaurantDisplay from './RestaurantDisplay';
 import VotingControls from './VotingControls';
 import LoginDialog from './LoginDialog';
+import RestaurantPanel from './RestaurantPanel';
 import { authService, restaurantService } from '../services/api';
 import './MainWindow.css';
 
@@ -11,8 +12,11 @@ const MainWindow: React.FC = () => {
   const [confirmed, setConfirmed] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [showLoginDialog, setShowLoginDialog] = useState<boolean>(false);
+  const [showRestaurantPanel, setShowRestaurantPanel] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentGroup, setCurrentGroup] = useState<number | null>(null);
+  const [token, setToken] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   // Handle login
   const handleLoginClick = () => {
@@ -24,8 +28,16 @@ const MainWindow: React.FC = () => {
       const response = await authService.login(username, password);
       setIsLoggedIn(true);
       setCurrentUser(username);
-      // In a real app, we would get the group ID from the login response
-      setCurrentGroup(1); // Temporary hardcoded group ID
+      setToken(response.token);
+      setIsAdmin(response.user.isAdmin);
+      
+      // Set current group if available
+      if (response.user.currentGroupId) {
+        setCurrentGroup(response.user.currentGroupId);
+      } else if (response.user.groups && response.user.groups.length > 0) {
+        setCurrentGroup(response.user.groups[0].id);
+      }
+      
       setShowLoginDialog(false);
     } catch (error) {
       console.error('Login failed:', error);
@@ -46,6 +58,8 @@ const MainWindow: React.FC = () => {
       setCurrentGroup(null);
       setRestaurantName('');
       setConfirmed(false);
+      setToken('');
+      setIsAdmin(false);
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -56,8 +70,8 @@ const MainWindow: React.FC = () => {
     if (!currentGroup) return;
     
     try {
-      await restaurantService.voteYes(currentGroup);
-      setConfirmed(true);
+      const response = await restaurantService.voteYes(currentGroup, token);
+      setConfirmed(response.isConfirmed);
       alert('Vote was cast');
     } catch (error) {
       console.error('Failed to vote yes:', error);
@@ -69,7 +83,8 @@ const MainWindow: React.FC = () => {
     if (!currentGroup) return;
     
     try {
-      await restaurantService.voteNo(currentGroup);
+      const response = await restaurantService.voteNo(currentGroup, token);
+      setConfirmed(response.isConfirmed);
       alert('Vote was cast');
     } catch (error) {
       console.error('Failed to vote no:', error);
@@ -81,13 +96,18 @@ const MainWindow: React.FC = () => {
     if (!currentGroup) return;
     
     try {
-      const response = await restaurantService.getRandomRestaurant(currentGroup);
-      setRestaurantName(response.name);
+      const response = await restaurantService.getRandomRestaurant(currentGroup, token);
+      setRestaurantName(response.restaurant.name);
       setConfirmed(false);
     } catch (error) {
       console.error('Failed to get random restaurant:', error);
       alert('Failed to get random restaurant');
     }
+  };
+
+  // Panel toggle functions
+  const handleRestaurantPanelToggle = () => {
+    setShowRestaurantPanel(!showRestaurantPanel);
   };
 
   return (
@@ -109,7 +129,7 @@ const MainWindow: React.FC = () => {
             <div className="dropdown-content">
               <div className="dropdown-item">User Info</div>
               <div className="dropdown-item">Group Info</div>
-              <div className="dropdown-item">Restaurants</div>
+              <div className="dropdown-item" onClick={handleRestaurantPanelToggle}>Restaurants</div>
             </div>
           </div>
           <div className="menu-item">
@@ -132,6 +152,13 @@ const MainWindow: React.FC = () => {
         isVisible={showLoginDialog} 
         onLogin={handleLoginSubmit}
         onCancel={handleLoginCancel}
+      />
+      
+      <RestaurantPanel
+        isVisible={showRestaurantPanel}
+        onClose={handleRestaurantPanelToggle}
+        token={token}
+        groupId={currentGroup || undefined}
       />
     </div>
   );

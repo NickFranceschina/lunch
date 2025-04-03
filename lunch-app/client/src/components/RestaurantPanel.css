@@ -1,0 +1,121 @@
+.restaurant-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.restaurant-panel {
+  background-color: #333;
+  border: 1px solid #808080;
+  padding: 20px;
+  width: 80%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: #E0E0E0;
+}
+
+.restaurant-panel h2, .restaurant-panel h3 {
+  color: #FFFFFF;
+  margin-top: 0;
+  border-bottom: 1px solid #555;
+  padding-bottom: 10px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.form-group input, .form-group textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #808080;
+  background-color: #222;
+  color: #FFFFFF;
+}
+
+.form-group textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.button-group button, .close-button, .restaurant-actions button {
+  padding: 8px 15px;
+  background-color: #555;
+  border: none;
+  color: #FFFFFF;
+  cursor: pointer;
+}
+
+.button-group button:hover, .close-button:hover, .restaurant-actions button:hover {
+  background-color: #666;
+}
+
+.button-group button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.restaurant-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.restaurant-card {
+  background-color: #444;
+  border: 1px solid #666;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.restaurant-card h4 {
+  margin-top: 0;
+  color: #FFFFFF;
+  border-bottom: 1px solid #555;
+  padding-bottom: 5px;
+}
+
+.restaurant-card p {
+  margin: 5px 0;
+}
+
+.restaurant-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.error-message {
+  background-color: rgba(255, 0, 0, 0.2);
+  border: 1px solid #ff0000;
+  color: #ff6666;
+  padding: 10px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+}
+
+.close-button {
+  margin-top: 20px;
+  width: 100%;
+} 

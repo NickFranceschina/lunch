@@ -8,6 +8,7 @@ import { seedDatabase } from "./seeds/initial.seed";
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import groupRoutes from './routes/group.routes';
+import restaurantRoutes from './routes/restaurant.routes';
 
 const app: Express = express();
 const port = process.env.PORT || 3001;
@@ -25,6 +26,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/restaurants', restaurantRoutes);
 
 // Root route
 app.get('/', (req: Request, res: Response) => {
@@ -51,3 +53,5 @@ AppDataSource.initialize()
         });
     })
     .catch((error) => console.log("Error during Data Source initialization:", error)); 
+
+export default app; 
