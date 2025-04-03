@@ -1,4 +1,4 @@
-.restaurant-panel-overlay {
+.group-panel-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -11,7 +11,7 @@
   z-index: 1000;
 }
 
-.restaurant-panel {
+.group-panel {
   background-color: #333;
   border: 1px solid #808080;
   padding: 20px;
@@ -22,7 +22,7 @@
   color: #E0E0E0;
 }
 
-.restaurant-panel h2, .restaurant-panel h3 {
+.group-panel h2, .group-panel h3 {
   color: #FFFFFF;
   margin-top: 0;
   border-bottom: 1px solid #555;
@@ -35,24 +35,24 @@
   gap: 20px;
 }
 
-.restaurant-list-container {
+.group-list-container {
   background-color: #222;
   padding: 15px;
   border: 1px solid #555;
   border-radius: 4px;
 }
 
-.restaurant-list {
+.group-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-top: 10px;
   margin-bottom: 20px;
-  max-height: 300px;
+  max-height: 200px;
   overflow-y: auto;
 }
 
-.restaurant-item {
+.group-item {
   padding: 8px 12px;
   background-color: #444;
   border-radius: 4px;
@@ -60,24 +60,24 @@
   transition: background-color 0.2s;
 }
 
-.restaurant-item:hover {
+.group-item:hover {
   background-color: #555;
 }
 
-.restaurant-item.selected-restaurant {
+.group-item.selected-group {
   background-color: #555;
   border-left: 3px solid #ffd700;
 }
 
-.restaurant-details {
+.group-item.current-group {
+  border-left: 3px solid #4CAF50;
+}
+
+.group-details {
   background-color: #222;
   padding: 15px;
   border: 1px solid #555;
   border-radius: 4px;
-}
-
-.restaurant-info {
-  margin-bottom: 20px;
 }
 
 .info-row {
@@ -85,16 +85,6 @@
   justify-content: space-between;
   padding: 8px 0;
   border-bottom: 1px solid #444;
-}
-
-.restaurant-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.restaurant-actions button {
-  flex: 1;
 }
 
 .form-group {
@@ -106,8 +96,7 @@
   margin-bottom: 5px;
 }
 
-.form-group input[type="text"],
-.form-group textarea {
+.form-group input {
   width: 100%;
   padding: 8px;
   border: 1px solid #808080;
@@ -115,18 +104,75 @@
   color: #FFFFFF;
 }
 
-.form-group textarea {
-  min-height: 80px;
-  resize: vertical;
-}
-
 .button-group {
   display: flex;
   gap: 10px;
+  margin-top: 15px;
+}
+
+.add-button, .join-button, .leave-button, .close-button, .cancel-button {
+  padding: 8px 15px;
+  background-color: #555;
+  border: none;
+  color: #FFFFFF;
+  cursor: pointer;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.button-group .add-button, .button-group .cancel-button {
+  flex: 1;
+  margin-top: 0;
+}
+
+.add-button:hover, .join-button:hover, .leave-button:hover, .close-button:hover, .cancel-button:hover {
+  background-color: #666;
+}
+
+.add-button:disabled, .join-button:disabled, .leave-button:disabled, .cancel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-button {
+  background-color: #666;
+}
+
+.join-button {
+  background-color: #4CAF50;
+}
+
+.join-button:hover {
+  background-color: #3e8e41;
+}
+
+.leave-button {
+  background-color: #a63232;
+}
+
+.leave-button:hover {
+  background-color: #c53030;
+}
+
+.update-notification {
   margin-top: 20px;
 }
 
-.button-group button, .close-button, .add-button, .edit-button, .delete-button, .cancel-button {
+.update-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.update-form input {
+  flex: 1;
+  padding: 8px;
+  background-color: #222;
+  border: 1px solid #808080;
+  color: #FFFFFF;
+}
+
+.update-form button {
   padding: 8px 15px;
   background-color: #555;
   border: none;
@@ -134,43 +180,31 @@
   cursor: pointer;
 }
 
-.button-group button {
-  flex: 1;
-}
-
-.button-group button:hover, .close-button:hover, .edit-button:hover {
+.update-form button:hover {
   background-color: #666;
 }
 
-.button-group button:disabled, .edit-button:disabled, .delete-button:disabled {
+.update-form button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.add-button {
-  width: 100%;
-  margin-top: 10px;
-  background-color: #555;
+.members-list {
+  margin-top: 20px;
 }
 
-.edit-button {
-  background-color: #555;
+.members-list ul {
+  list-style-type: none;
+  padding: 0;
 }
 
-.delete-button {
-  background-color: #a63232;
+.members-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid #444;
 }
 
-.delete-button:hover {
-  background-color: #c53030;
-}
-
-.cancel-button {
-  background-color: #666;
-}
-
-.cancel-button:hover {
-  background-color: #777;
+.current-user-indicator {
+  color: #4CAF50;
 }
 
 .error-message {

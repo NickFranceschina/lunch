@@ -4,6 +4,8 @@ import RestaurantDisplay from './RestaurantDisplay';
 import VotingControls from './VotingControls';
 import LoginDialog from './LoginDialog';
 import RestaurantPanel from './RestaurantPanel';
+import UserPanel from './UserPanel';
+import GroupPanel from './GroupPanel';
 import { authService, restaurantService } from '../services/api';
 import './MainWindow.css';
 
@@ -13,7 +15,10 @@ const MainWindow: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [showLoginDialog, setShowLoginDialog] = useState<boolean>(false);
   const [showRestaurantPanel, setShowRestaurantPanel] = useState<boolean>(false);
+  const [showUserPanel, setShowUserPanel] = useState<boolean>(false);
+  const [showGroupPanel, setShowGroupPanel] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<number>(0);
   const [currentGroup, setCurrentGroup] = useState<number | null>(null);
   const [token, setToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -28,6 +33,7 @@ const MainWindow: React.FC = () => {
       const response = await authService.login(username, password);
       setIsLoggedIn(true);
       setCurrentUser(username);
+      setCurrentUserId(response.user.id);
       setToken(response.token);
       setIsAdmin(response.user.isAdmin);
       
@@ -52,9 +58,10 @@ const MainWindow: React.FC = () => {
   // Handle logout
   const handleLogout = async () => {
     try {
-      await authService.logout();
+      await authService.logout(token);
       setIsLoggedIn(false);
       setCurrentUser('');
+      setCurrentUserId(0);
       setCurrentGroup(null);
       setRestaurantName('');
       setConfirmed(false);
@@ -110,6 +117,14 @@ const MainWindow: React.FC = () => {
     setShowRestaurantPanel(!showRestaurantPanel);
   };
 
+  const handleUserPanelToggle = () => {
+    setShowUserPanel(!showUserPanel);
+  };
+
+  const handleGroupPanelToggle = () => {
+    setShowGroupPanel(!showGroupPanel);
+  };
+
   return (
     <div className="main-window">
       <div className="top-bar">
@@ -124,14 +139,16 @@ const MainWindow: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="menu-item">
-            <span>Administer</span>
-            <div className="dropdown-content">
-              <div className="dropdown-item">User Info</div>
-              <div className="dropdown-item">Group Info</div>
-              <div className="dropdown-item" onClick={handleRestaurantPanelToggle}>Restaurants</div>
+          {isLoggedIn && isAdmin && (
+            <div className="menu-item">
+              <span>Administer</span>
+              <div className="dropdown-content">
+                <div className="dropdown-item" onClick={handleUserPanelToggle}>User Info</div>
+                <div className="dropdown-item" onClick={handleGroupPanelToggle}>Group Info</div>
+                <div className="dropdown-item" onClick={handleRestaurantPanelToggle}>Restaurants</div>
+              </div>
             </div>
-          </div>
+          )}
           <div className="menu-item">
             <span>About</span>
           </div>
@@ -159,6 +176,22 @@ const MainWindow: React.FC = () => {
         onClose={handleRestaurantPanelToggle}
         token={token}
         groupId={currentGroup || undefined}
+      />
+
+      <UserPanel
+        isVisible={showUserPanel}
+        onClose={handleUserPanelToggle}
+        token={token}
+        isAdmin={isAdmin}
+        currentUserId={currentUserId}
+      />
+
+      <GroupPanel
+        isVisible={showGroupPanel}
+        onClose={handleGroupPanelToggle}
+        token={token}
+        currentUserId={currentUserId}
+        currentGroupId={currentGroup || undefined}
       />
     </div>
   );

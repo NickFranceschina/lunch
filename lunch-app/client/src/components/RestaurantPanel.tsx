@@ -34,6 +34,8 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
     website: ''
   });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null);
+  const [editMode, setEditMode] = useState<boolean>(false);
 
   // Fetch restaurants on component mount
   useEffect(() => {
@@ -58,6 +60,12 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
 
       const data = await response.json();
       setRestaurants(data.restaurants);
+      
+      // Select first restaurant by default if none selected
+      if (data.restaurants.length > 0 && !selectedRestaurantId) {
+        setSelectedRestaurantId(data.restaurants[0].id);
+      }
+      
       setError(null);
     } catch (err) {
       setError('Error loading restaurants. Please try again.');
@@ -76,7 +84,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
     });
   };
 
-  // Handle form submission for new restaurant
+  // Handle form submission for new/updated restaurant
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -115,6 +123,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
         website: ''
       });
       setEditingId(null);
+      setEditMode(false);
       await fetchRestaurants();
     } catch (err) {
       setError(`Error ${editingId ? 'updating' : 'creating'} restaurant. Please try again.`);
@@ -134,6 +143,15 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       website: restaurant.website || ''
     });
     setEditingId(restaurant.id);
+    setEditMode(true);
+  };
+
+  // Select a restaurant
+  const handleSelectRestaurant = (restaurant: Restaurant) => {
+    setSelectedRestaurantId(restaurant.id);
+    if (editMode) {
+      handleEdit(restaurant);
+    }
   };
 
   // Delete a restaurant
@@ -156,6 +174,11 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       }
 
       await fetchRestaurants();
+      if (id === selectedRestaurantId) {
+        setSelectedRestaurantId(restaurants.length > 0 ? restaurants[0].id : null);
+      }
+      setEditMode(false);
+      setEditingId(null);
     } catch (err) {
       setError('Error deleting restaurant. Please try again.');
       console.error('Error deleting restaurant:', err);
@@ -164,117 +187,221 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
     }
   };
 
+  // Reset form for adding new restaurant
+  const handleAddNewClick = () => {
+    setFormData({
+      name: '',
+      description: '',
+      address: '',
+      phone: '',
+      website: ''
+    });
+    setEditingId(null);
+    setEditMode(true);
+  };
+
+  // Cancel edit mode
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setEditingId(null);
+    setFormData({
+      name: '',
+      description: '',
+      address: '',
+      phone: '',
+      website: ''
+    });
+  };
+
+  // Get selected restaurant
+  const getSelectedRestaurant = () => {
+    return restaurants.find(r => r.id === selectedRestaurantId) || null;
+  };
+
   if (!isVisible) return null;
+
+  const selectedRestaurant = getSelectedRestaurant();
 
   return (
     <div className="restaurant-panel-overlay">
       <div className="restaurant-panel">
-        <h2>{editingId ? 'Edit Restaurant' : 'Add New Restaurant'}</h2>
+        <h2>Restaurant Management</h2>
         
         {error && <div className="error-message">{error}</div>}
         
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="name">Name:</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="description">Description:</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="address">Address:</label>
-            <input
-              type="text"
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="phone">Phone:</label>
-            <input
-              type="text"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="website">Website:</label>
-            <input
-              type="text"
-              id="website"
-              name="website"
-              value={formData.website}
-              onChange={handleInputChange}
-            />
-          </div>
-          
-          <div className="button-group">
-            <button type="submit" disabled={loading}>
-              {editingId ? 'Update' : 'Add'} Restaurant
-            </button>
-            {editingId && (
+        <div className="panel-layout">
+          <div className="restaurant-list-container">
+            <h3>Restaurants</h3>
+            {loading && restaurants.length === 0 ? (
+              <p>Loading restaurants...</p>
+            ) : restaurants.length === 0 ? (
+              <p>No restaurants found.</p>
+            ) : (
+              <div className="restaurant-list">
+                {restaurants.map(restaurant => (
+                  <div 
+                    key={restaurant.id} 
+                    className={`restaurant-item ${selectedRestaurantId === restaurant.id ? 'selected-restaurant' : ''}`}
+                    onClick={() => handleSelectRestaurant(restaurant)}
+                  >
+                    <span>{restaurant.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!editMode ? (
               <button 
-                type="button" 
-                onClick={() => {
-                  setFormData({
-                    name: '',
-                    description: '',
-                    address: '',
-                    phone: '',
-                    website: ''
-                  });
-                  setEditingId(null);
-                }}
+                className="add-button" 
+                onClick={handleAddNewClick}
+                disabled={loading}
               >
-                Cancel
+                Add New Restaurant
               </button>
+            ) : null}
+          </div>
+
+          <div className="restaurant-details">
+            {editMode ? (
+              <>
+                <h3>{editingId ? 'Edit Restaurant' : 'Add New Restaurant'}</h3>
+                <form onSubmit={handleSubmit}>
+                  <div className="form-group">
+                    <label htmlFor="name">Name:</label>
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="description">Description:</label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="address">Address:</label>
+                    <input
+                      type="text"
+                      id="address"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="phone">Phone:</label>
+                    <input
+                      type="text"
+                      id="phone"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="website">Website:</label>
+                    <input
+                      type="text"
+                      id="website"
+                      name="website"
+                      value={formData.website}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="button-group">
+                    <button type="submit" disabled={loading}>
+                      {editingId ? 'Update' : 'Add'} Restaurant
+                    </button>
+                    {editingId && (
+                      <button 
+                        type="button" 
+                        onClick={() => handleDelete(editingId)}
+                        className="delete-button"
+                        disabled={loading}
+                      >
+                        Delete Restaurant
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      onClick={handleCancelEdit}
+                      className="cancel-button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              selectedRestaurant ? (
+                <>
+                  <h3>Restaurant Details</h3>
+                  <div className="restaurant-info">
+                    <div className="info-row">
+                      <span>Name:</span>
+                      <span>{selectedRestaurant.name}</span>
+                    </div>
+                    {selectedRestaurant.description && (
+                      <div className="info-row">
+                        <span>Description:</span>
+                        <span>{selectedRestaurant.description}</span>
+                      </div>
+                    )}
+                    {selectedRestaurant.address && (
+                      <div className="info-row">
+                        <span>Address:</span>
+                        <span>{selectedRestaurant.address}</span>
+                      </div>
+                    )}
+                    {selectedRestaurant.phone && (
+                      <div className="info-row">
+                        <span>Phone:</span>
+                        <span>{selectedRestaurant.phone}</span>
+                      </div>
+                    )}
+                    {selectedRestaurant.website && (
+                      <div className="info-row">
+                        <span>Website:</span>
+                        <span>{selectedRestaurant.website}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="restaurant-actions">
+                    <button 
+                      onClick={() => handleEdit(selectedRestaurant)}
+                      disabled={loading}
+                      className="edit-button"
+                    >
+                      Edit Restaurant
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(selectedRestaurant.id)}
+                      disabled={loading}
+                      className="delete-button"
+                    >
+                      Delete Restaurant
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p>Select a restaurant to view details</p>
+              )
             )}
           </div>
-        </form>
-        
-        <h3>Restaurant List</h3>
-        {loading ? (
-          <p>Loading restaurants...</p>
-        ) : restaurants.length === 0 ? (
-          <p>No restaurants found.</p>
-        ) : (
-          <div className="restaurant-list">
-            {restaurants.map(restaurant => (
-              <div key={restaurant.id} className="restaurant-card">
-                <h4>{restaurant.name}</h4>
-                {restaurant.description && <p>{restaurant.description}</p>}
-                {restaurant.address && <p><strong>Address:</strong> {restaurant.address}</p>}
-                {restaurant.phone && <p><strong>Phone:</strong> {restaurant.phone}</p>}
-                {restaurant.website && <p><strong>Website:</strong> {restaurant.website}</p>}
-                <div className="restaurant-actions">
-                  <button onClick={() => handleEdit(restaurant)}>Edit</button>
-                  <button onClick={() => handleDelete(restaurant.id)}>Delete</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
         
         <button className="close-button" onClick={onClose}>Close</button>
       </div>

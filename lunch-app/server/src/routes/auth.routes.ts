@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
+import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.post('/login', authController.login);
  * @desc    Logout a user
  * @access  Private
  */
-router.post('/logout', authController.logout);
+router.post('/logout', authenticateToken, authController.logout);
 
 /**
  * @route   POST /api/auth/register

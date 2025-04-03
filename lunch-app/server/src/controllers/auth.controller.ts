@@ -85,7 +85,7 @@ export const login = async (req: Request, res: Response) => {
  */
 export const logout = async (req: Request, res: Response) => {
   try {
-    const userId = req.body.userId || (req as any).userId;
+    const userId = (req as any).userId;
 
     if (!userId) {
       return res.status(400).json({ 

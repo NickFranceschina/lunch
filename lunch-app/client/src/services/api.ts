@@ -18,18 +18,17 @@ export const authService = {
     return response.json();
   },
   
-  logout: async (token?: string) => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+  logout: async (token: string) => {
+    if (!token) {
+      throw new Error('Token is required for logout');
     }
     
     const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
     
     if (!response.ok) {
