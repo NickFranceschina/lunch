@@ -34,6 +34,11 @@ The modernization is well underway with the following features implemented:
 - Secure session-based authentication with WebSocket connections
 - User session persistence across page refreshes
 - Automatic window management (closing panels/chats on logout)
+- Scheduled lunch time notifications that:
+  - Automatically select a random restaurant at a group's configured lunch time
+  - "Pop up" the application window for all users in the group
+  - Display browser notifications when it's time for lunch
+  - Allow groups to set specific times for their lunch break
 
 ## Repository Structure
 
@@ -107,6 +112,11 @@ Individual services can be started separately using:
 - Session persistence across page refreshes (tab-specific)
 - Direct and group chat functionality
 - Automatic window management
+- Group lunch time scheduling with automatic notifications:
+  - Configure specific lunch times for each group
+  - Automatic selection of random restaurants at lunch time
+  - Browser notifications and window focus at lunch time
+  - Cron-like scheduling system running on the server
 
 ### Next Steps:
 - Testing infrastructure

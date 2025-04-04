@@ -57,6 +57,11 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
   - [x] Chat messages
 - [x] Create database schema (SQLite implemented instead of PostgreSQL)
 - [x] Implement data migration from Access database
+- [x] Implement scheduled lunch time notifications:
+  - [x] Group-specific lunch time configuration
+  - [x] Automatic random restaurant selection at lunch time
+  - [x] Browser notifications and window pop-up
+  - [x] Cron-like timing system
 
 ### 3. Database Migration
 - [x] Create new database schema:
@@ -162,6 +167,12 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 - Chat functionality is implemented (both user-to-user and group chat)
 - Input validation prevents common user errors
 - Automatic window management improves the user experience during logout
+- Group lunch time notifications are fully implemented:
+  - Groups can set specific times for lunch
+  - Server automatically selects a random restaurant at the configured time
+  - Users receive browser notifications when it's lunch time
+  - Application windows automatically pop up for all users in the group at lunch time
+  - Legacy VB6 "system tray pop-up" behavior has been recreated
 
 ## Next Steps
 1. ✅ Implement WebSocket for real-time updates (COMPLETED)
@@ -172,9 +183,14 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
    - ✅ Implement sessionStorage-based token storage
    - ✅ Add automatic session restoration
    - ✅ Improve input validation
-4. Set up testing framework and write tests
-5. Implement error handling and logging
-6. Create deployment configuration
+4. ✅ Implement lunch time notification system (COMPLETED):
+   - ✅ Create scheduler on the server
+   - ✅ Add group notification time settings
+   - ✅ Implement window pop-up functionality
+   - ✅ Add browser notifications
+5. Set up testing framework and write tests
+6. Implement error handling and logging
+7. Create deployment configuration
 
 ## Notes
 - Maintain the original black background with white text theme
@@ -183,7 +199,7 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 - Maintain the same voting and random selection logic
 - Keep the group-based restaurant selection system
 - Preserve the chat functionality
-- Maintain the same notification system timing
+- ✅ Maintain the same notification system timing (COMPLETED)
 - Use Windows 98-style UI with status bar instead of alerts
 
 ## Future Considerations
