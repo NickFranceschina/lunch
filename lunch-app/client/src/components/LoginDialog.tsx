@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './LoginDialog.css';
+import './Win98Panel.css';
 
 interface LoginDialogProps {
   onLogin: (username: string, password: string) => void;
@@ -11,6 +12,31 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  // Handle Escape key to cancel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    if (isVisible) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isVisible, onCancel]);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isVisible) {
+      setUsername('');
+      setPassword('');
+    }
+  }, [isVisible]);
+
   if (!isVisible) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -19,35 +45,56 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
   };
 
   return (
-    <div className="login-overlay">
-      <div className="login-dialog">
-        <h2>Login</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="username">Username:</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="password">Password:</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div className="button-group">
-            <button type="submit">Login</button>
-            <button type="button" onClick={onCancel}>Cancel</button>
-          </div>
-        </form>
+    <div className="win98-panel-overlay">
+      <div className="win98-panel" style={{ width: '320px' }}>
+        <div className="win98-panel-header">
+          <div className="win98-panel-title">Login</div>
+          <button className="win98-panel-close" onClick={onCancel}>×</button>
+        </div>
+
+        <div className="win98-panel-content">
+          <form onSubmit={handleSubmit}>
+            <div className="win98-form-row">
+              <label className="win98-label" htmlFor="username">Username:</label>
+              <input
+                className="win98-input"
+                type="text"
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="win98-form-row">
+              <label className="win98-label" htmlFor="password">Password:</label>
+              <input
+                className="win98-input"
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="win98-panel-footer">
+              <button 
+                type="button" 
+                className="win98-button" 
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="win98-button primary"
+                disabled={!username || !password}
+              >
+                Login
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

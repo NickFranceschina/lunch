@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import LEDIndicator from './LEDIndicator';
 import RestaurantDisplay from './RestaurantDisplay';
 import VotingControls from './VotingControls';
@@ -361,7 +361,7 @@ const MainWindow: React.FC = () => {
               </>
             )}
           </div>
-          <LEDIndicator confirmed={confirmed} />
+          <LEDIndicator confirmed={confirmed} currentUser={currentUser} />
         </div>
         
         <div className="content">
