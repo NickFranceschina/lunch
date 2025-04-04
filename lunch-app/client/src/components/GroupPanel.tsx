@@ -476,7 +476,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
               {showAddForm ? (
                 <div className="win98-panel-section">
                   <div className="win98-section-title">Add New Group</div>
-                  <form onSubmit={handleSubmit}>
+                  <form onSubmit={handleSubmit} autoComplete="off">
                     <div className="win98-form-row">
                       <label className="win98-label" htmlFor="name">Name:</label>
                       <input
@@ -551,7 +551,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                   {activeTab === 'details' && (
                     <>
                       {isAdmin ? (
-                        <form>
+                        <form autoComplete="off">
                           <div className="win98-form-row">
                             <label className="win98-label" htmlFor="name">Name:</label>
                             <input

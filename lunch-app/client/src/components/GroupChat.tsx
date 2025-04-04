@@ -568,7 +568,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
         </div>
       )}
       
-      <form className="message-input-form" onSubmit={handleSendMessage}>
+      <form className="message-input-form" onSubmit={handleSendMessage} autoComplete="off">
         <input
           type="text"
           value={newMessage}

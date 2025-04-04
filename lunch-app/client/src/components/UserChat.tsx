@@ -222,7 +222,7 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
         <div ref={messagesEndRef} />
       </div>
       
-      <form className="message-input-form" onSubmit={handleSendMessage}>
+      <form className="message-input-form" onSubmit={handleSendMessage} autoComplete="off">
         <input
           type="text"
           value={newMessage}
