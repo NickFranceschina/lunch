@@ -12,7 +12,9 @@ interface Position {
  * @returns Object with position, ref for the container, and ref for the drag handle
  */
 const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering: boolean = false) => {
-  const [position, setPosition] = useState<Position>(initialPosition);
+  // Set the initial state directly for immediate positioning
+  const initialCenteredPosition = skipCentering ? initialPosition : { x: 0, y: 0 };
+  const [position, setPosition] = useState<Position>(initialCenteredPosition);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -27,27 +29,23 @@ const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering:
       return;
     }
     
-    // Otherwise, center the dialog (default behavior)
-    const timer = setTimeout(() => {
-      if (containerRef.current && !positionedRef.current) {
-        positionedRef.current = true;
-        
-        const rect = containerRef.current.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
-        // Center the element in the viewport
-        const newX = Math.max(0, (viewportWidth - rect.width) / 2);
-        const newY = Math.max(0, (viewportHeight - rect.height) / 3); // Position it at 1/3 from the top
-        
-        setPosition({
-          x: newX,
-          y: newY
-        });
-      }
-    }, 50); // Small delay to ensure the element is rendered
-    
-    return () => clearTimeout(timer);
+    // Apply centering immediately with no delay
+    if (containerRef.current && !positionedRef.current) {
+      positionedRef.current = true;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Center the element in the viewport
+      const newX = Math.max(0, (viewportWidth - rect.width) / 2);
+      const newY = Math.max(0, (viewportHeight - rect.height) / 3); // Position it at 1/3 from the top
+      
+      setPosition({
+        x: newX,
+        y: newY
+      });
+    }
   }, [skipCentering]);
 
   useEffect(() => {

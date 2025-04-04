@@ -41,6 +41,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const [noVotes, setNoVotes] = useState<number>(0);
   const [hasVoted, setHasVoted] = useState<boolean>(false);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
   // Chat state
   const [showUserChat, setShowUserChat] = useState<boolean>(false);
@@ -49,7 +50,13 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const [groupChatData, setGroupChatData] = useState<Group | null>(null);
 
   // Use draggable hook
-  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
+  // Set skipCentering to true and pass our own initial position for the window
+  // to prevent the "jump" effect
+  const initialPosition = {
+    x: Math.max(0, (window.innerWidth - 600) / 2), // 600px is the window width
+    y: Math.max(0, window.innerHeight / 3)
+  };
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable(initialPosition, true);
 
   // Handle toggle functions
   const handleRestaurantPanelToggle = () => {
@@ -390,14 +397,6 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     };
   }, [isLoggedIn, token, currentGroup, showGroupChat, showUserChat]);
 
-  // Reset position when component mounts
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      resetPosition();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []); // Only run on mount, not when resetPosition changes
-
   // Add useEffect to check for existing session on component mount
   useEffect(() => {
     // Check if there's a valid session in sessionStorage
@@ -423,6 +422,9 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       
       showStatusMessage(`Welcome back, ${storedUsername}!`);
     }
+    
+    // Mark initialization as complete after checking session
+    setIsInitialized(true);
   }, []); // Empty dependency array means this runs once on mount
 
   // Handle login
@@ -606,7 +608,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     }
   };
 
-  return isVisible ? (
+  return isVisible && isInitialized ? (
     <div className="main-window-container">
       <div
         className="main-window"
