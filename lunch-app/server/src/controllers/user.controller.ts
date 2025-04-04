@@ -128,11 +128,12 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     }
 
     // Update user fields
-    const { username, password, currentGroupId } = req.body;
+    const { username, password, currentGroupId, isAdmin } = req.body;
     
     if (username) user.username = username;
     if (currentGroupId) user.currentGroupId = currentGroupId;
-    
+    if (isAdmin) user.isAdmin = isAdmin;
+
     // Only update password if provided
     if (password) {
       user.password = await bcrypt.hash(password, 10);
