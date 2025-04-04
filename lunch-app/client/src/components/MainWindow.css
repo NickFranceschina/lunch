@@ -49,12 +49,12 @@
 }
 
 .title-bar {
-  height: 18px;
+  height: 22px;
   background: linear-gradient(90deg, #000080, #1084d0);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 3px;
+  padding: 2px 4px;
   color: white;
   font-weight: bold;
   font-size: 11px;
@@ -68,8 +68,11 @@
 }
 
 .title-icon {
-  margin-right: 5px;
+  margin-right: 8px;
+  margin-bottom: 2px;
   filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.5));
+  width: 18px;
+  height: 18px;
 }
 
 .title-bar-controls {

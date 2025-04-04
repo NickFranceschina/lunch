@@ -71,17 +71,7 @@ const Win98Taskbar: React.FC<Win98TaskbarProps> = ({ toggleMainWindowVisibility 
           title="Lunch App" 
           onClick={toggleMainWindowVisibility}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 3.5V13.5H13V3.5L11 2H5L3 3.5Z" fill="#A0522D" />
-            <path d="M3 3.5L5 2H11L13 3.5V5H3V3.5Z" fill="#D2B48C" />
-            <path d="M4 6H12V12H4V6Z" fill="#A0522D" />
-            <path d="M6 7H7V8H6V7Z" fill="#FFD700" />
-            <path d="M9 7H10V8H9V7Z" fill="#228B22" />
-            <path d="M3 5H13V6H3V5Z" fill="#A0522D" />
-            <path d="M3 3.5V5M13 3.5V5" stroke="#000000" strokeWidth="0.5" />
-            <path d="M3 13.5H13" stroke="#000000" strokeWidth="0.5" />
-            <path d="M7 10L9 10" stroke="#000000" strokeWidth="0.5" />
-          </svg>
+          <img src="/favicon.ico" alt="Lunch App" width="20" height="20" />
         </div>
         <div className="win98-tray-clock">
           {currentTime}

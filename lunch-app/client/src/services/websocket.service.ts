@@ -329,7 +329,7 @@ class WebSocketService {
         if (Notification.permission === 'granted') {
           const notification = new Notification('Lunch App', {
             body: message.data.message,
-            icon: '/logo192.png'
+            icon: '/favicon.ico'
           });
           
           // Close notification after 5 seconds
@@ -352,7 +352,7 @@ class WebSocketService {
         if (Notification.permission === 'granted') {
           const notification = new Notification('It\'s Lunch Time!', {
             body: `${message.data.message}\nToday's suggestion: ${message.data.restaurant}`,
-            icon: '/logo192.png'
+            icon: '/favicon.ico'
           });
           
           // Focus window when notification is clicked
