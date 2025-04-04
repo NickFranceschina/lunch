@@ -230,6 +230,7 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
           placeholder="Type a message..."
           className="message-input"
           disabled={!websocketService.isConnected()}
+          autoComplete="off"
         />
         <button 
           type="submit" 

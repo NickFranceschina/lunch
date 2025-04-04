@@ -371,14 +371,16 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
           // Create cleanup function
           cleanupFunction = () => {
             console.log('Cleaning up WebSocket listeners');
-            selectionUnsubscribe();
-            voteUnsubscribe();
-            notificationUnsubscribe();
-            chatUnsubscribe();
-            userPresenceUnsubscribe();
-            connectionEstablishedUnsubscribe();
-            errorUnsubscribe();
-            clearInterval(pingInterval);
+            // Add null/undefined checks for all unsubscribe functions
+            if (selectionUnsubscribe) selectionUnsubscribe();
+            if (voteUnsubscribe) voteUnsubscribe();
+            if (notificationUnsubscribe) notificationUnsubscribe();
+            if (chatUnsubscribe) chatUnsubscribe();
+            if (userPresenceUnsubscribe) userPresenceUnsubscribe();
+            if (connectionEstablishedUnsubscribe) connectionEstablishedUnsubscribe();
+            if (errorUnsubscribe) errorUnsubscribe();
+            
+            if (pingInterval) clearInterval(pingInterval);
             
             // Only disconnect if no active chat windows (this was causing the disconnection issue)
             if (!showGroupChat && !showUserChat) {

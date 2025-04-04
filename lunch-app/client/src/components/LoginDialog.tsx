@@ -86,6 +86,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 autoFocus
+                autoComplete="off"
               />
             </div>
             <div className="win98-form-row">
@@ -97,6 +98,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="off"
               />
             </div>
             <div className="win98-panel-footer">

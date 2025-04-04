@@ -70,10 +70,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     return () => {
       console.log('WebSocketContext - Cleanup: Checking if disconnect needed...');
       // Check if still connected before disconnecting
-      if (websocketService.isConnected()) {
-         console.log('WebSocketContext - Cleanup: Disconnecting WebSocket...');
-         websocketService.disconnect();
-         setIsConnected(false);
+      try {
+        if (websocketService && websocketService.isConnected()) {
+          console.log('WebSocketContext - Cleanup: Disconnecting WebSocket...');
+          websocketService.disconnect();
+          setIsConnected(false);
+        }
+      } catch (error) {
+        console.error('WebSocketContext - Error during cleanup:', error);
       }
     };
   // Add authState?.token and authState?.isAuthenticated to dependencies

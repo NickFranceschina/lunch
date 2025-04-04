@@ -194,8 +194,11 @@ class WebSocketService {
       console.log('No active WebSocket connection to disconnect');
     }
     
-    // Clear all message listeners to prevent memory leaks
+    // Clear all message listeners to prevent memory leaks - reset to empty object instead of undefined
     this.messageListeners = {};
+    
+    // Clear connection listeners - reset to empty array instead of undefined
+    this.connectionListeners = [];
     
     // Clear the processed message IDs set
     this.processedMessageIds.clear();
@@ -257,8 +260,11 @@ class WebSocketService {
 
     // Return an unsubscribe function
     return () => {
-      this.messageListeners[type] = this.messageListeners[type].filter(cb => cb !== callback);
-      console.log(`Removed listener for ${type}, now has ${this.messageListeners[type].length} listeners`);
+      // Add null/undefined check before filtering
+      if (this.messageListeners && this.messageListeners[type]) {
+        this.messageListeners[type] = this.messageListeners[type].filter(cb => cb !== callback);
+        console.log(`Removed listener for ${type}, now has ${this.messageListeners[type].length} listeners`);
+      }
     };
   }
 
@@ -613,7 +619,10 @@ class WebSocketService {
       callback(this.socket?.readyState === WebSocket.OPEN);
 
       return () => {
-          this.connectionListeners = this.connectionListeners.filter(cb => cb !== callback);
+          // Add null/undefined check before filtering
+          if (this.connectionListeners) {
+              this.connectionListeners = this.connectionListeners.filter(cb => cb !== callback);
+          }
       };
   }
 }

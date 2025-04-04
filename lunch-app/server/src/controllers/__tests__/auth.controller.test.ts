@@ -11,6 +11,7 @@ jest.mock('../../config/database', () => ({
   AppDataSource: {
     getRepository: jest.fn().mockReturnValue({
       findOne: jest.fn(),
+      find: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
     }),
@@ -60,15 +61,12 @@ describe('Authentication Controller', () => {
       const res = mockResponse();
       req.body = { username: 'nonexistent', password: 'password' };
 
-      const mockFindOne = AppDataSource.getRepository(User).findOne as jest.Mock;
-      mockFindOne.mockResolvedValueOnce(null);
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([]);
 
       await login(req, res);
 
-      expect(mockFindOne).toHaveBeenCalledWith({
-        where: { username: 'nonexistent' },
-        relations: ['groups'],
-      });
+      expect(mockFind).toHaveBeenCalledWith({ relations: ['groups'] });
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
@@ -90,8 +88,8 @@ describe('Authentication Controller', () => {
         groups: [],
       };
 
-      const mockFindOne = AppDataSource.getRepository(User).findOne as jest.Mock;
-      mockFindOne.mockResolvedValueOnce(mockUser);
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([mockUser]);
 
       // Mock bcrypt.compare to return false for invalid password
       jest.spyOn(bcrypt, 'compare').mockResolvedValueOnce(false);
@@ -128,8 +126,8 @@ describe('Authentication Controller', () => {
         port: null,
       };
 
-      const mockFindOne = AppDataSource.getRepository(User).findOne as jest.Mock;
-      mockFindOne.mockResolvedValueOnce(mockUser);
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([mockUser]);
 
       // Mock bcrypt.compare to return true for valid password
       jest.spyOn(bcrypt, 'compare').mockResolvedValueOnce(true);
@@ -176,6 +174,43 @@ describe('Authentication Controller', () => {
         },
         token: 'mocked.jwt.token',
       });
+    });
+    
+    it('should handle case-insensitive username matching', async () => {
+      const req = mockRequest();
+      const res = mockResponse();
+      req.body = { 
+        username: 'TESTUSER', // Uppercase version of the username
+        password: 'correctpassword',
+      };
+
+      const mockUser = {
+        id: 1,
+        username: 'testuser', // Stored in lowercase
+        password: 'hashedpassword',
+        isAdmin: false,
+        currentGroupId: 2,
+        groups: [],
+        isLoggedIn: false,
+      };
+
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([mockUser]);
+
+      // Mock bcrypt.compare to return true for valid password
+      jest.spyOn(bcrypt, 'compare').mockResolvedValueOnce(true);
+
+      // Mock jwt.sign
+      jest.spyOn(jwt, 'sign').mockReturnValueOnce('mocked.jwt.token');
+
+      await login(req, res);
+
+      // Verify login was successful
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        message: 'Login successful'
+      }));
     });
   });
 
@@ -265,12 +300,30 @@ describe('Authentication Controller', () => {
       const res = mockResponse();
       req.body = { username: 'existinguser', password: 'password' };
 
-      const mockFindOne = AppDataSource.getRepository(User).findOne as jest.Mock;
-      mockFindOne.mockResolvedValueOnce({ id: 2, username: 'existinguser' });
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([{ id: 1, username: 'existinguser' }]);
 
       await register(req, res);
 
-      expect(mockFindOne).toHaveBeenCalledWith({ where: { username: 'existinguser' } });
+      expect(mockFind).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Username already exists',
+      });
+    });
+
+    it('should handle case-insensitive username conflicts', async () => {
+      const req = mockRequest();
+      const res = mockResponse();
+      req.body = { username: 'ExistingUser', password: 'password' }; // Different case
+
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([{ id: 1, username: 'existinguser' }]); // Lowercase in DB
+
+      await register(req, res);
+
+      expect(mockFind).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
@@ -283,8 +336,8 @@ describe('Authentication Controller', () => {
       const res = mockResponse();
       req.body = { username: 'newuser', password: 'password123' };
 
-      const mockFindOne = AppDataSource.getRepository(User).findOne as jest.Mock;
-      mockFindOne.mockResolvedValueOnce(null);
+      const mockFind = AppDataSource.getRepository(User).find as jest.Mock;
+      mockFind.mockResolvedValueOnce([]);
 
       const mockCreate = AppDataSource.getRepository(User).create as jest.Mock;
       mockCreate.mockReturnValueOnce({

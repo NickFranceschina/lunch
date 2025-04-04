@@ -21,11 +21,14 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
-    // Find the user
-    const user = await userRepository.findOne({ 
-      where: { username },
+    // Find the user with case-insensitive username matching
+    const users = await userRepository.find({
       relations: ['groups']
     });
+    
+    const user = users.find(u => 
+      u.username.toLowerCase() === username.toLowerCase()
+    );
 
     if (!user) {
       return res.status(401).json({ 
@@ -135,8 +138,12 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if user already exists
-    const existingUser = await userRepository.findOne({ where: { username } });
+    // Check if user already exists (case-insensitive)
+    const users = await userRepository.find();
+    const existingUser = users.find(u => 
+      u.username.toLowerCase() === username.toLowerCase()
+    );
+    
     if (existingUser) {
       return res.status(409).json({ 
         success: false, 

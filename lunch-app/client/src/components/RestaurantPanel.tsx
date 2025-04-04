@@ -336,6 +336,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         value={formData.name}
                         onChange={handleInputChange}
                         required
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -347,6 +348,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="description"
                         value={formData.description}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -359,6 +361,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="address"
                         value={formData.address}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -371,6 +374,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -383,6 +387,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="website"
                         value={formData.website}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -418,6 +423,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         value={formData.name}
                         onChange={handleInputChange}
                         required
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -429,6 +435,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="description"
                         value={formData.description}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -441,6 +448,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="address"
                         value={formData.address}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -453,6 +461,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                     
@@ -465,6 +474,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                         name="website"
                         value={formData.website}
                         onChange={handleInputChange}
+                        autoComplete="off"
                       />
                     </div>
                   </div>

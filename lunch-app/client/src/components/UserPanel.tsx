@@ -501,6 +501,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
                           onChange={handleInputChange}
                           className="win98-input"
                           required
+                          autoComplete="off"
                         />
                       </div>
                       <div className="win98-form-row">
@@ -513,6 +514,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
                           onChange={handleInputChange}
                           className="win98-input"
                           required
+                          autoComplete="off"
                         />
                       </div>
                       <div className="win98-form-row">
@@ -581,6 +583,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
                           className="win98-input"
                           required
                           disabled={selectedUser.id === currentUserId}
+                          autoComplete="off"
                         />
                       </div>
                       <div className="win98-form-row">
@@ -594,6 +597,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
                           className="win98-input"
                           placeholder="Leave blank to keep current"
                           disabled={selectedUser.id === currentUserId}
+                          autoComplete="off"
                         />
                       </div>
                       <div className="win98-form-row">
