@@ -6,7 +6,7 @@
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "seed": "ts-node src/run-seed.ts",
+    "seed": "node dist/run-seed.js",
     "check-data": "ts-node src/check-data.ts",
     "test": "jest"
   },

@@ -9,7 +9,7 @@ import * as path from "path";
 
 export const AppDataSource = new DataSource({
     type: "sqlite",
-    database: path.join(__dirname, "..", "..", "lunch.db"),
+    database: path.join("/app", "database", "lunch.db"),
     synchronize: true, // Set to false in production
     logging: true,
     entities: [User, Group, Restaurant, GroupRestaurant, Chat, Setting],

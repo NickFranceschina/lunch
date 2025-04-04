@@ -5,6 +5,7 @@ import { AppDataSource } from "./config/database";
 import { seedDatabase } from "./seeds/initial.seed";
 import * as http from 'http';
 import { initWebSocketServer } from './config/websocket';
+import * as path from 'path';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -40,20 +41,12 @@ app.get('/ws-status', (req: Request, res: Response) => {
   });
 });
 
-// API Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/chat', chatRoutes);
-
-// Root route
-app.get('/', (req: Request, res: Response) => {
-  res.json({ 
-    message: 'Welcome to the Lunch App API',
-    version: '1.0.0'
-  });
-});
 
 // Test endpoint to manually trigger lunch time check (only for testing)
 app.post('/api/test/trigger-lunch-check', (req: Request, res: Response) => {
@@ -215,6 +208,18 @@ app.get('/api/test/group-time/:groupId', async (req: Request, res: Response) => 
       message: 'Error checking group notification time',
       error: error.message
     });
+  }
+});
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Handle SPA routing - send all requests not for API or existing files to index.html
+app.use('*', (req, res) => {
+  if (!req.originalUrl.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  } else {
+    res.status(404).json({ message: 'API endpoint not found' });
   }
 });
 

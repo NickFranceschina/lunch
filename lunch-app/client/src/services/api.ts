@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:3001';
+// In combined server setup, API is served from the same host/port as the client
+const API_BASE_URL = '';
 
 // Auth service
 export const authService = {

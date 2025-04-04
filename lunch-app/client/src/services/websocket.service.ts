@@ -82,9 +82,10 @@ class WebSocketService {
         }
       }
       
+      // For combined server, use the same host and port as the client
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = process.env.REACT_APP_WS_HOST || window.location.hostname;
-      const port = process.env.REACT_APP_WS_PORT || '3001';
+      const host = window.location.hostname;
+      const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
       
       const url = `${protocol}//${host}:${port}?token=${token}`;
       
