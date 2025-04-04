@@ -21,20 +21,42 @@ This README explains how to deploy the Lunch Application using Docker on a Synol
    - Ensure HOST_PORT is set to the desired access port (default is 3001)
    - Update the JWT_SECRET with a secure key
 
-3. Build and start the Docker container:
+3. Make the deployment script executable:
    ```bash
-   docker-compose up -d
+   chmod +x deploy.sh
    ```
 
-4. Initialize the database (first time only):
+4. Run the deployment script:
+   ```bash
+   ./deploy.sh
+   ```
+
+5. Initialize the database (first time only):
    ```bash
    docker exec lunch-app npm run seed
    ```
 
-5. Check the logs to make sure everything started correctly:
+6. Check the logs to make sure everything started correctly:
    ```bash
    docker-compose logs
    ```
+
+## Automated Deployment
+
+The application includes an optimized deployment script (`deploy.sh`) that:
+
+- Pulls the latest changes from Git
+- Intelligently determines if a rebuild is necessary
+- Only performs a full rebuild (--no-cache) when dependencies change
+- Sets appropriate permissions for Docker volumes
+- Provides helpful error messages
+
+To update the application to the latest version:
+
+```bash
+cd lunch-app
+./deploy.sh
+```
 
 ## Accessing the Application
 
@@ -57,9 +79,10 @@ This README explains how to deploy the Lunch Application using Docker on a Synol
   docker-compose logs -f
   ```
 
-- Rebuild and update container:
+- Manual rebuild (if needed):
   ```bash
-  docker-compose up -d --build
+  docker-compose build
+  docker-compose up -d
   ```
 
 ## Synology NAS-Specific Instructions
@@ -72,6 +95,13 @@ This README explains how to deploy the Lunch Application using Docker on a Synol
    - Go to Container and you'll see your lunch-app container
    - You can start/stop/restart it from the interface
 
+5. Troubleshooting Synology permissions:
+   - If you encounter permission issues, make sure the user running Docker has write access to the directory
+   - You can manually fix public directory permissions with:
+   ```bash
+   docker-compose exec lunch-app bash -c 'chmod -R 777 /app/public'
+   ```
+
 ## Backing Up Data
 
 The SQLite database is stored in a volume mount at `./database` on the host machine.
@@ -81,10 +111,27 @@ To back up the data, simply copy the database directory to a safe location:
 cp -r /path/to/lunch-app/database /path/to/backup/location
 ```
 
+## Performance Optimizations
+
+The application is configured for optimal performance:
+- Multi-stage Docker builds to minimize image size
+- Docker layer caching to speed up builds
+- Intelligent rebuilds based on code changes
+- Proper placement of dependencies in Docker layers
+- Optimized Node.js production runtime
+
 ## Troubleshooting
 
 - Make sure the required port (default 3001) is open in your firewall
 - Check the Docker logs for any error messages:
   ```bash
   docker logs lunch-app
+  ```
+- If you encounter permission errors:
+  ```bash
+  docker-compose exec lunch-app bash -c 'chmod -R 777 /app/public'
+  ```
+- If builds are taking too long, check if your dependencies have changed or try:
+  ```bash
+  docker system prune -a  # Warning: Removes all unused images
   ``` 

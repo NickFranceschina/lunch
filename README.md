@@ -108,6 +108,30 @@ Individual services can be started separately using:
 - `npm run start:server` - Start only the server
 - `npm run start:browser-tools` - Start only the browser tools
 
+## Production Deployment
+
+The application can be deployed using Docker for a production environment:
+
+### Docker Deployment
+
+1. Navigate to the lunch-app directory:
+```bash
+cd lunch-app
+```
+
+2. Run the deployment script:
+```bash
+./deploy.sh
+```
+
+This script handles:
+- Pulling the latest changes from Git
+- Intelligently determining if a rebuild is necessary
+- Only performing a full rebuild when dependencies change
+- Setting appropriate permissions for Docker volumes
+
+For detailed deployment instructions, including Synology NAS setup, see the [Docker Deployment README](./lunch-app/DOCKER-README.md).
+
 ### Testing
 
 The application includes a comprehensive testing infrastructure:
