@@ -44,7 +44,7 @@ describe('API Services', () => {
         const result = await authService.login('testuser', 'password123');
 
         expect(global.fetch).toHaveBeenCalledWith(
-          'http://localhost:3001/api/auth/login',
+          '/api/auth/login',
           {
             method: 'POST',
             headers: {
@@ -75,7 +75,7 @@ describe('API Services', () => {
         const result = await authService.logout('test-token-123');
 
         expect(global.fetch).toHaveBeenCalledWith(
-          'http://localhost:3001/api/auth/logout',
+          '/api/auth/logout',
           {
             method: 'POST',
             headers: {
@@ -115,7 +115,7 @@ describe('API Services', () => {
         const result = await restaurantService.getRandomRestaurant(groupId, token);
 
         expect(global.fetch).toHaveBeenCalledWith(
-          `http://localhost:3001/api/restaurants/group/${groupId}/random`,
+          `/api/restaurants/group/${groupId}/random`,
           {
             method: 'GET',
             headers: {
@@ -151,7 +151,7 @@ describe('API Services', () => {
         const result = await restaurantService.getCurrentRestaurant(groupId, token);
 
         expect(global.fetch).toHaveBeenCalledWith(
-          `http://localhost:3001/api/restaurants/group/${groupId}/current`,
+          `/api/restaurants/group/${groupId}/current`,
           {
             method: 'GET',
             headers: {
@@ -187,7 +187,7 @@ describe('API Services', () => {
         const result = await restaurantService.voteYes(groupId, token);
 
         expect(global.fetch).toHaveBeenCalledWith(
-          `http://localhost:3001/api/restaurants/group/${groupId}/vote`,
+          `/api/restaurants/group/${groupId}/vote`,
           {
             method: 'POST',
             headers: {
@@ -224,7 +224,7 @@ describe('API Services', () => {
         const result = await restaurantService.voteNo(groupId, token);
 
         expect(global.fetch).toHaveBeenCalledWith(
-          `http://localhost:3001/api/restaurants/group/${groupId}/vote`,
+          `/api/restaurants/group/${groupId}/vote`,
           {
             method: 'POST',
             headers: {

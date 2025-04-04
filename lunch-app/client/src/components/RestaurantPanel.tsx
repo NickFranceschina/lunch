@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { restaurantService } from '../services/api'; // Import the service
 import './RestaurantPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
@@ -47,37 +48,29 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
   
   const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('restaurant-panel', initialPosition, true);
 
-  // Fetch restaurants on component mount
+  // Fetch restaurants
   useEffect(() => {
     if (isVisible) {
       fetchRestaurants();
     }
   }, [isVisible]);
 
-  // Fetch all restaurants
   const fetchRestaurants = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/restaurants', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // Use the restaurantService
+      const response = await restaurantService.getAllRestaurants(token);
+      console.log('Restaurant API response:', response);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch restaurants');
-      }
-
-      const data = await response.json();
-      setRestaurants(data.restaurants);
-      
-      // Select first restaurant by default if none selected
-      if (data.restaurants.length > 0 && !selectedRestaurantId) {
-        setSelectedRestaurantId(data.restaurants[0].id);
+      if (!response.success) { // Adjust based on actual response structure
+        throw new Error(response.message || 'Failed to fetch restaurants');
       }
       
+      // Fix: The API returns restaurants in response.restaurants, not response.data
+      console.log('Setting restaurants state with:', response.restaurants);
+      setRestaurants(response.restaurants); 
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
       setError('Error loading restaurants. Please try again.');
       console.error('Error fetching restaurants:', err);
     } finally {
@@ -112,49 +105,39 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
     setHasChanges(hasNameChange || hasDescriptionChange || hasAddressChange || hasPhoneChange || hasWebsiteChange);
   };
 
-  // Handle form submission for new/updated restaurant
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setLoading(true);
+
+    const url = editingId
+      ? `/api/restaurants/${editingId}` // Use relative path
+      : '/api/restaurants'; // Use relative path
+    const method = editingId ? 'PUT' : 'POST';
+
     try {
-      setLoading(true);
-      
-      const url = editingId 
-        ? `http://localhost:3001/api/restaurants/${editingId}`
-        : 'http://localhost:3001/api/restaurants';
-
-      const method = editingId ? 'PUT' : 'POST';
-      
-      const body = groupId && !editingId
-        ? { ...formData, groupId }
-        : formData;
-
+      // Keep fetch for now, but use relative URL
+      // Ideally, use restaurantService.updateRestaurant or restaurantService.createRestaurant
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(formData)
       });
-
+      
       if (!response.ok) {
-        throw new Error(`Failed to ${editingId ? 'update' : 'create'} restaurant`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to ${editingId ? 'update' : 'create'} restaurant`);
       }
 
-      // Reset form and reload restaurants
-      setFormData({
-        name: '',
-        description: '',
-        address: '',
-        phone: '',
-        website: ''
-      });
+      // Reset form and reload
+      setFormData({ name: '', description: '', address: '', phone: '', website: '' });
       setEditingId(null);
-      setSelectedRestaurantId(null);
-      await fetchRestaurants();
-    } catch (err) {
-      setError(`Error ${editingId ? 'updating' : 'creating'} restaurant. Please try again.`);
+      await fetchRestaurants(); // Reload restaurants
+    } catch (err: any) {
+      setError(err.message || `Error ${editingId ? 'updating' : 'creating'} restaurant.`);
       console.error(`Error ${editingId ? 'updating' : 'creating'} restaurant:`, err);
     } finally {
       setLoading(false);
@@ -163,6 +146,8 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
 
   // Edit a restaurant
   const handleEdit = (restaurant: Restaurant) => {
+    setEditingId(restaurant.id);
+    setSelectedRestaurantId(restaurant.id); // Keep showing details while editing
     setFormData({
       name: restaurant.name,
       description: restaurant.description || '',
@@ -170,23 +155,27 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       phone: restaurant.phone || '',
       website: restaurant.website || ''
     });
-    setEditingId(restaurant.id);
-    setSelectedRestaurantId(restaurant.id);
-    setHasChanges(false);
   };
 
   // Select a restaurant
-  const handleSelectRestaurant = (restaurant: Restaurant) => {
-    setSelectedRestaurantId(restaurant.id);
-    setFormData({
-      name: restaurant.name,
-      description: restaurant.description || '',
-      address: restaurant.address || '',
-      phone: restaurant.phone || '',
-      website: restaurant.website || ''
-    });
-    setEditingId(restaurant.id);
-    setHasChanges(false);
+  const handleRestaurantSelect = (restaurant: Restaurant) => {
+    if (editingId === restaurant.id) {
+      // If already editing this one, just show details (or toggle off editing?)
+      // For now, let's just keep editing
+      setSelectedRestaurantId(restaurant.id); 
+    } else {
+      setSelectedRestaurantId(restaurant.id); // Show details
+      setEditingId(null); // Ensure not in edit mode unless Edit is clicked
+      
+      // Populate the form with the selected restaurant's data for viewing
+      setFormData({
+        name: restaurant.name || '',
+        description: restaurant.description || '',
+        address: restaurant.address || '',
+        phone: restaurant.phone || '',
+        website: restaurant.website || ''
+      });
+    }
   };
 
   // Delete a restaurant
@@ -197,24 +186,15 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/restaurants/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // Use the restaurantService
+      const response = await restaurantService.deleteRestaurant(id, token);
 
-      if (!response.ok) {
-        throw new Error('Failed to delete restaurant');
+      if (!response.success) { // Adjust based on actual response structure
+        throw new Error(response.message || 'Failed to delete restaurant');
       }
 
-      await fetchRestaurants();
-      if (id === selectedRestaurantId) {
-        setSelectedRestaurantId(restaurants.length > 0 ? restaurants[0].id : null);
-      }
-      setEditingId(null);
-      setSelectedRestaurantId(null);
-    } catch (err) {
+      await fetchRestaurants(); // Reload restaurants
+    } catch (err: any) {
       setError('Error deleting restaurant. Please try again.');
       console.error('Error deleting restaurant:', err);
     } finally {
@@ -237,26 +217,9 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
 
   // Cancel changes
   const handleCancel = () => {
-    if (!selectedRestaurantId) {
-      // If adding a new restaurant, cancel back to selection
-      if (restaurants.length > 0) {
-        handleSelectRestaurant(restaurants[0]);
-      }
-    } else {
-      // If editing, reset to original values
-      const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-      if (restaurant) {
-        setFormData({
-          name: restaurant.name,
-          description: restaurant.description || '',
-          address: restaurant.address || '',
-          phone: restaurant.phone || '',
-          website: restaurant.website || ''
-        });
-        setEditingId(restaurant.id);
-        setHasChanges(false);
-      }
-    }
+    setEditingId(null);
+    setFormData({ name: '', description: '', address: '', phone: '', website: '' });
+    // Keep selectedRestaurantId as is, to continue showing details
   };
 
   // Handle form submission for updates
@@ -266,24 +229,22 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
     try {
       setLoading(true);
       
-      const response = await fetch(`http://localhost:3001/api/restaurants/${selectedRestaurantId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
+      // Use the restaurantService instead of hardcoded URL
+      const response = await restaurantService.updateRestaurant(
+        selectedRestaurantId,
+        formData,
+        token
+      );
 
-      if (!response.ok) {
-        throw new Error('Failed to update restaurant');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update restaurant');
       }
 
       // Refresh data
       await fetchRestaurants();
       setHasChanges(false);
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
       setError('Error updating restaurant. Please try again.');
       console.error('Error updating restaurant:', err);
     } finally {
@@ -291,14 +252,17 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
     }
   };
 
-  // Get selected restaurant
-  const getSelectedRestaurant = () => {
+  // Replace the getSelectedRestaurant function with useMemo
+  const selectedRestaurant = React.useMemo(() => {
+    // First check if restaurants is defined and is an array
+    if (!restaurants || !Array.isArray(restaurants)) {
+      return null;
+    }
+    // Then safely use .find()
     return restaurants.find(r => r.id === selectedRestaurantId) || null;
-  };
+  }, [restaurants, selectedRestaurantId]);
 
   if (!isVisible) return null;
-
-  const selectedRestaurant = getSelectedRestaurant();
 
   return (
     <div className="win98-panel-overlay">
@@ -327,16 +291,16 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
             <div className="win98-panel-left">
               <div className="win98-section-title">Restaurants</div>
               <div className="win98-list">
-                {loading && restaurants.length === 0 ? (
+                {loading && (!restaurants || restaurants.length === 0) ? (
                   <div className="win98-list-item">Loading restaurants...</div>
-                ) : restaurants.length === 0 ? (
+                ) : !restaurants || restaurants.length === 0 ? (
                   <div className="win98-list-item">No restaurants found.</div>
                 ) : (
                   restaurants.map(restaurant => (
                     <div 
                       key={restaurant.id} 
                       className={`win98-list-item ${selectedRestaurantId === restaurant.id ? 'selected' : ''}`}
-                      onClick={() => handleSelectRestaurant(restaurant)}
+                      onClick={() => handleRestaurantSelect(restaurant)}
                     >
                       {restaurant.name}
                     </div>

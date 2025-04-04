@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { websocketService } from '../services/websocket.service';
-import { groupService } from '../services/api';
+import { groupService, userService, authService } from '../services/api';
 import './UserPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
@@ -98,20 +98,16 @@ const UserPanel: React.FC<UserPanelProps> = ({
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/users?includeGroups=true', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await userService.getAllUsers(token);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch users');
       }
 
-      const data = await response.json();
+      const data = response.data;
       const filteredUsers = showOnlyLoggedIn 
-        ? data.data.filter((user: User) => user.isLoggedIn)
-        : data.data;
+        ? data.filter((user: User) => user.isLoggedIn)
+        : data;
       
       setUsers(filteredUsers);
       
@@ -121,8 +117,8 @@ const UserPanel: React.FC<UserPanelProps> = ({
       }
       
       setError(null);
-    } catch (err) {
-      setError('Error loading users. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Error loading users. Please try again.');
       console.error('Error fetching users:', err);
     } finally {
       setLoading(false);
@@ -217,7 +213,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
       // Prepare data for submission, excluding currentGroupId
       const { currentGroupId, ...userData } = formData;
       
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,14 +223,17 @@ const UserPanel: React.FC<UserPanelProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create user');
+         const errorData = await response.json();
+         throw new Error(errorData.message || 'Failed to create user');
       }
 
       const result = await response.json();
       
       // If a group was selected, add the user to the group
-      if (currentGroupId) {
+      if (currentGroupId && result.data?.id) {
         await handleChangeGroup(result.data.id, currentGroupId);
+      } else if (!result.data?.id) {
+        console.warn("User created, but ID not found in response for group assignment.")
       }
 
       // Reset form and reload users
@@ -246,8 +245,8 @@ const UserPanel: React.FC<UserPanelProps> = ({
       });
       setShowAddForm(false);
       await fetchUsers();
-    } catch (err) {
-      setError('Error creating user. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Error creating user. Please try again.');
       console.error('Error creating user:', err);
     } finally {
       setLoading(false);
@@ -267,17 +266,10 @@ const UserPanel: React.FC<UserPanelProps> = ({
       // Only include password if it was provided
       const dataToSend = password ? { ...userData, password } : userData;
       
-      const response = await fetch(`http://localhost:3001/api/users/${selectedUserId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dataToSend)
-      });
+      const response = await userService.updateUser(selectedUserId, dataToSend, token);
 
-      if (!response.ok) {
-        throw new Error('Failed to update user');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update user');
       }
 
       // If group changed, update the user's group
@@ -292,8 +284,8 @@ const UserPanel: React.FC<UserPanelProps> = ({
       await fetchUsers();
       setHasChanges(false);
       setError(null);
-    } catch (err) {
-      setError('Error updating user. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Error updating user. Please try again.');
       console.error('Error updating user:', err);
     } finally {
       setLoading(false);
@@ -308,23 +300,18 @@ const UserPanel: React.FC<UserPanelProps> = ({
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/users/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await userService.deleteUser(id, token);
 
-      if (!response.ok) {
-        throw new Error('Failed to delete user');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete user');
       }
 
       await fetchUsers();
       if (id === selectedUserId) {
         setSelectedUserId(users.length > 0 ? users[0].id : null);
       }
-    } catch (err) {
-      setError('Error deleting user. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Error deleting user. Please try again.');
       console.error('Error deleting user:', err);
     } finally {
       setLoading(false);

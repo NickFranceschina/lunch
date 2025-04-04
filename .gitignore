@@ -36,5 +36,14 @@ build/
 dist/
 
 # Database
-lunch.db
+# Ignore root db file if any
+lunch.db 
+# Ignore server db file for local dev
 lunch-app/server/lunch.db 
+# Ignore db file in docker volume mount point
+lunch-app/database/lunch.db 
+*.sqlite
+*.sqlite3
+
+# Client Proxy (Optional, some commit this)
+# lunch-app/client/src/setupProxy.js 

@@ -26,7 +26,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatHeight = 500; // Fixed height of chat window
-  const { connected } = useWebSocket();
+  const { isConnected } = useWebSocket();
   const { authState } = useAuth();
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState<boolean>(false);
@@ -396,7 +396,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
     
     console.log('Validation:', {
       messageEmpty: !trimmedMessage,
-      connected,
+      isConnected,
       webSocketConnected: isWebSocketConnected,
       directConnectionCheck,
       userLoggedIn: !!authState.user,

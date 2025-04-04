@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { groupService } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { groupService, userService } from '../services/api';
 import './GroupPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
@@ -34,6 +34,14 @@ interface GroupPanelProps {
   isAdmin?: boolean;
 }
 
+// Define form data state type with optional id
+interface GroupFormData {
+  id: number | null; // Allow null for new groups
+  name: string;
+  description: string;
+  notificationTime: string; // Assuming HH:MM format
+}
+
 const GroupPanel: React.FC<GroupPanelProps> = ({
   isVisible,
   onClose,
@@ -48,14 +56,11 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{
-    name: string;
-    description: string;
-    notificationTime: string;
-  }>({
+  const [formData, setFormData] = useState<GroupFormData>({
+    id: null, // Initialize id as null
     name: '',
     description: '',
-    notificationTime: '12:00'
+    notificationTime: '12:00' // Default time
   });
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
@@ -70,65 +75,61 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   
   const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('group-panel', initialPosition, true);
 
-  // Fetch groups on component mount
+  // Fetch initial data
   useEffect(() => {
     if (isVisible) {
       fetchGroups();
-      if (isAdmin) {
-        fetchAllUsers();
-      }
+      fetchAllUsers(); // Fetch all users for adding
     }
-  }, [isVisible, isAdmin]);
-
-  // Select current group initially
-  useEffect(() => {
-    if (groups.length > 0) {
-      if (currentGroupId) {
-        const currentGroup = groups.find(group => group.id === currentGroupId);
-        if (currentGroup) {
-          selectGroup(currentGroup);
-          return;
-        }
-      }
-      // If no current group or it wasn't found, select the first group
-      selectGroup(groups[0]);
-    }
-  }, [groups, currentGroupId]);
+  }, [isVisible]);
 
   // Fetch all groups
   const fetchGroups = async () => {
     try {
       setLoading(true);
       const response = await groupService.getAllGroups(token);
+      if (!response.success) { throw new Error(response.message); }
       setGroups(response.data);
-      setError(null);
-    } catch (err) {
-      setError('Error loading groups. Please try again.');
-      console.error('Error fetching groups:', err);
+      // Select first group by default
+      if (response.data.length > 0 && !currentGroupId) {
+        selectGroup(response.data[0]);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch groups');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch all users (admin only)
+  // Fetch all users (for adding to groups)
   const fetchAllUsers = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/users?includeGroups=true', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-
-      const data = await response.json();
-      setAllUsers(data.data);
-    } catch (err) {
-      console.error('Error fetching users:', err);
+      setLoading(true);
+      // Use userService
+      const response = await userService.getAllUsers(token);
+      if (!response.success) { throw new Error(response.message); }
+      setAllUsers(response.data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Fetch users for the selected group
+  const fetchGroupUsers = useCallback(async (groupId: number) => {
+    try {
+      setLoading(true);
+      // Use groupService to get group details including users
+      const response = await groupService.getGroupById(groupId, token);
+      if (!response.success) { throw new Error(response.message); }
+      setSelectedGroup(response.data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch group users');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -197,6 +198,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     }
     
     setFormData({
+      id: group.id,
       name: group.name,
       description: group.description || '',
       notificationTime: timeString
@@ -207,26 +209,28 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     setHasChanges(false);
   };
 
-  // Handle form submission for new group
+  // Handle form submission for new/updated group
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    const isUpdating = formData.id !== null;
     
     try {
-      setLoading(true);
+      const apiCall = isUpdating
+        ? groupService.updateGroup(formData.id!, formData, token)
+        : groupService.createGroup(formData, token);
+        
+      const response = await apiCall;
+      if (!response.success) { throw new Error(response.message); }
       
-      await groupService.createGroup(formData, token);
-
-      // Reset form and reload groups
-      setFormData({
-        name: '',
-        description: '',
-        notificationTime: '12:00'
-      });
-      setShowAddForm(false);
-      await fetchGroups();
-    } catch (err) {
-      setError('Error creating group. Please try again.');
-      console.error('Error creating group:', err);
+      await fetchGroups(); // Refresh the group list
+      // If creating, select the new group
+      if (!isUpdating && response.data) {
+        selectGroup(response.data);
+      }
+      resetForm();
+    } catch (err: any) {
+      setError(err.message || `Failed to ${isUpdating ? 'update' : 'create'} group`);
     } finally {
       setLoading(false);
     }
@@ -309,7 +313,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       await groupService.addUserToGroup(selectedGroup.id, selectedUser, token);
-      await fetchGroups();
+      await fetchGroupUsers(selectedGroup.id); // Refresh group users
       setSelectedUser(null);
       setShowUserSelector(false);
     } catch (err) {
@@ -331,7 +335,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       await groupService.removeUserFromGroup(selectedGroup.id, userId, token);
-      await fetchGroups();
+      await fetchGroupUsers(selectedGroup.id); // Refresh group users
     } catch (err) {
       setError('Failed to remove user from group. Please try again.');
       console.error('Failed to remove user from group:', err);
@@ -381,6 +385,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   // Handle Add New Group button
   const handleAddNewClick = () => {
     setFormData({
+      id: null,
       name: '',
       description: '',
       notificationTime: '12:00'
@@ -395,6 +400,18 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     if (groups.length > 0) {
       selectGroup(groups[0]);
     }
+  };
+
+  // Reset form function
+  const resetForm = () => {
+    setFormData({
+      id: null,
+      name: '',
+      description: '',
+      notificationTime: '12:00'
+    });
+    setHasChanges(false);
+    setShowAddForm(false);
   };
 
   if (!isVisible) return null;
