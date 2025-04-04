@@ -16,7 +16,12 @@ import { Group } from '../types/Group';
 import useDraggable from '../hooks/useDraggable';
 import './MainWindow.css';
 
-const MainWindow: React.FC = () => {
+interface MainWindowProps {
+  isVisible: boolean;
+  toggleVisibility: () => void;
+}
+
+const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) => {
   const [restaurantName, setRestaurantName] = useState<string>('');
   const [confirmed, setConfirmed] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -601,7 +606,7 @@ const MainWindow: React.FC = () => {
     }
   };
 
-  return (
+  return isVisible ? (
     <div className="main-window-container">
       <div
         className="main-window"
@@ -616,11 +621,24 @@ const MainWindow: React.FC = () => {
           className="title-bar"
           ref={dragHandleRef}
         >
-          <div className="title-bar-text">LUNCH</div>
+          <div className="title-bar-text">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="title-icon">
+              <path d="M3 3.5V13.5H13V3.5L11 2H5L3 3.5Z" fill="#A0522D" />
+              <path d="M3 3.5L5 2H11L13 3.5V5H3V3.5Z" fill="#D2B48C" />
+              <path d="M4 6H12V12H4V6Z" fill="#A0522D" />
+              <path d="M6 7H7V8H6V7Z" fill="#FFD700" />
+              <path d="M9 7H10V8H9V7Z" fill="#228B22" />
+              <path d="M3 5H13V6H3V5Z" fill="#A0522D" />
+              <path d="M3 3.5V5M13 3.5V5" stroke="#000000" strokeWidth="0.5" />
+              <path d="M3 13.5H13" stroke="#000000" strokeWidth="0.5" />
+              <path d="M7 10L9 10" stroke="#000000" strokeWidth="0.5" />
+            </svg>
+            LUNCH
+          </div>
           <div className="title-bar-controls">
             <button aria-label="Minimize">_</button>
             <button aria-label="Maximize">□</button>
-            <button aria-label="Close">×</button>
+            <button aria-label="Close" onClick={toggleVisibility}>×</button>
           </div>
         </div>
         
@@ -773,7 +791,7 @@ const MainWindow: React.FC = () => {
         />
       )}
     </div>
-  );
+  ) : null;
 };
 
 export default MainWindow; 
