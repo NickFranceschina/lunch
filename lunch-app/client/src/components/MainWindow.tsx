@@ -362,6 +362,7 @@ const MainWindow: React.FC = () => {
                     <button className="menu-button">Chat</button>
                     <div className="dropdown-content">
                       <button onClick={handleStartGroupChat}>Group Chat</button>
+                      <button onClick={handleUserPanelToggle}>User Chat</button>
                     </div>
                   </div>
                   
