@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth, useWebSocket } from '../services';
 import { Group } from '../types/Group';
 import './GroupChat.css';
 import useDraggable from '../hooks/useDraggable';
@@ -22,17 +21,23 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const { authState } = useAuth();
-  const { connected, sendMessage, addMessageListener } = useWebSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { position, containerRef, dragHandleRef } = useDraggable({ x: window.innerWidth - 420, y: 20 });
+  const chatHeight = 500; // Fixed height of chat window
+
+  // Position at bottom right
+  const initialPosition = {
+    x: Math.max(20, window.innerWidth - 420),
+    y: window.innerHeight - chatHeight - 5 // 5px from bottom of screen
+  };
+  
+  const { position, containerRef, dragHandleRef } = useDraggable(initialPosition, true);
   
   // Listen for incoming messages
   useEffect(() => {
     // Function to handle new messages
     const handleChatMessage = (data: any) => {
       // Only add messages from this group
-      if (data.groupId === group.id) {
+      if (data && data.groupId === group.id) {
         const message: ChatMessage = {
           message: data.message,
           senderId: data.userId,
@@ -44,9 +49,6 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
         setMessages(prev => [...prev, message]);
       }
     };
-    
-    // Add listener for chat messages
-    const unsubscribe = addMessageListener('chat_message', handleChatMessage);
     
     // Fetch chat history when component mounts
     const fetchChatHistory = async () => {
@@ -64,8 +66,8 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
           },
           {
             message: `Let's discuss lunch options for today.`,
-            senderId: authState.user?.id || 0,
-            senderName: authState.user?.username || 'You',
+            senderId: 2,
+            senderName: 'You',
             timestamp: new Date(Date.now() - 1800000).toISOString(),
             groupId: group.id
           }
@@ -83,9 +85,9 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
     
     // Clean up on unmount
     return () => {
-      unsubscribe();
+      // Cleanup if needed
     };
-  }, [group.id, group.name, authState.user, addMessageListener]);
+  }, [group.id, group.name]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -95,25 +97,15 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !connected || !authState.user) {
+    if (!newMessage.trim()) {
       return;
     }
-    
-    // Create message object
-    const messageData = {
-      message: newMessage,
-      targetId: group.id,
-      isGroupChat: true
-    };
-    
-    // Send message through WebSocket
-    sendMessage('chat_message', messageData);
     
     // Add message to local state immediately (optimistic UI update)
     const localMessage: ChatMessage = {
       message: newMessage,
-      senderId: authState.user.id,
-      senderName: authState.user.username,
+      senderId: 2, // Current user ID
+      senderName: 'You',
       timestamp: new Date().toISOString(),
       groupId: group.id
     };
@@ -122,23 +114,29 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
     setNewMessage('');
   };
   
+  const handleCloseClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
+  
   return (
     <div 
-      className="group-chat-window"
+      className="group-chat-window win98-draggable"
       style={{
         position: 'absolute',
         top: `${position.y}px`,
-        left: `${position.x}px`
+        left: `${position.x}px`,
+        zIndex: 1100
       }}
       ref={containerRef}
     >
       <div 
         className="group-chat-header"
         ref={dragHandleRef}
-        style={{ cursor: 'move' }}
       >
         <div className="chat-title">Group Chat: {group.name}</div>
-        <button className="close-button" onClick={onClose}>×</button>
+        <button className="close-button" onClick={handleCloseClick}>×</button>
       </div>
       
       <div className="chat-messages">
@@ -150,11 +148,11 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
           messages.map((msg, index) => (
             <div 
               key={index} 
-              className={`message ${msg.senderId === authState.user?.id ? 'sent' : 'received'}`}
+              className={`message ${msg.senderId === 2 ? 'sent' : 'received'}`}
             >
               <div className="message-content">{msg.message}</div>
               <div className="message-meta">
-                <span className="sender">{msg.senderId === authState.user?.id ? 'You' : msg.senderName}</span>
+                <span className="sender">{msg.senderId === 2 ? 'You' : msg.senderName}</span>
                 <span className="timestamp">
                   {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
@@ -172,22 +170,15 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type a message to the group..."
           className="message-input"
-          disabled={!connected}
         />
         <button 
           type="submit" 
           className="send-button"
-          disabled={!connected || !newMessage.trim()}
+          disabled={!newMessage.trim()}
         >
           Send
         </button>
       </form>
-      
-      {!connected && (
-        <div className="connection-warning">
-          Not connected to chat server. Messages won't be sent.
-        </div>
-      )}
     </div>
   );
 };

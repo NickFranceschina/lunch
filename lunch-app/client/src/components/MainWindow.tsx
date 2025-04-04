@@ -13,6 +13,7 @@ import { authService, restaurantService, userService, groupService } from '../se
 import { websocketService } from '../services/websocket.service';
 import { User } from '../types/User';
 import { Group } from '../types/Group';
+import useDraggable from '../hooks/useDraggable';
 import './MainWindow.css';
 
 const MainWindow: React.FC = () => {
@@ -37,6 +38,54 @@ const MainWindow: React.FC = () => {
   const [showGroupChat, setShowGroupChat] = useState<boolean>(false);
   const [chatWithUser, setChatWithUser] = useState<User | null>(null);
   const [groupChatData, setGroupChatData] = useState<Group | null>(null);
+
+  // Use draggable hook
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
+
+  // Handle toggle functions
+  const handleRestaurantPanelToggle = () => {
+    setShowRestaurantPanel(!showRestaurantPanel);
+  };
+
+  const handleUserPanelToggle = () => {
+    setShowUserPanel(!showUserPanel);
+  };
+
+  const handleGroupPanelToggle = () => {
+    setShowGroupPanel(!showGroupPanel);
+  };
+
+  const handleStartUserChat = async (userId: number) => {
+    try {
+      const userData = await userService.getUserById(userId, token);
+      setChatWithUser(userData);
+      setShowUserChat(true);
+    } catch (error) {
+      console.error('Failed to get user data:', error);
+    }
+  };
+
+  const handleCloseUserChat = () => {
+    setShowUserChat(false);
+    setChatWithUser(null);
+  };
+
+  const handleStartGroupChat = async () => {
+    if (!currentGroup) return;
+    
+    try {
+      const groupData = await groupService.getGroupById(currentGroup, token);
+      setGroupChatData(groupData);
+      setShowGroupChat(true);
+    } catch (error) {
+      console.error('Failed to get group data:', error);
+    }
+  };
+
+  const handleCloseGroupChat = () => {
+    setShowGroupChat(false);
+    setGroupChatData(null);
+  };
 
   // Show status message with auto-hide after delay
   const showStatusMessage = (message: string, duration: number = 3000) => {
@@ -122,6 +171,14 @@ const MainWindow: React.FC = () => {
       }
     };
   }, [isLoggedIn, token]);
+
+  // Reset position when component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      resetPosition();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []); // Only run on mount, not when resetPosition changes
 
   // Handle login
   const handleLoginClick = () => {
@@ -254,154 +311,122 @@ const MainWindow: React.FC = () => {
         const response = await restaurantService.getRandomRestaurant(currentGroup, token);
         setRestaurantName(response.restaurant.name);
         setConfirmed(false);
-        showStatusMessage(`New restaurant selected: ${response.restaurant.name}`);
+        showStatusMessage('Selected a new random restaurant');
       } catch (error) {
         console.error('Failed to get random restaurant:', error);
-        showStatusMessage('Failed to get random restaurant', 5000);
+        showStatusMessage('Failed to select a new restaurant', 5000);
       }
     }
   };
 
-  // Panel toggle functions
-  const handleRestaurantPanelToggle = () => {
-    setShowRestaurantPanel(!showRestaurantPanel);
-  };
-
-  const handleUserPanelToggle = () => {
-    setShowUserPanel(!showUserPanel);
-  };
-
-  const handleGroupPanelToggle = () => {
-    setShowGroupPanel(!showGroupPanel);
-  };
-  
-  // Chat functions
-  const handleStartUserChat = async (userId: number) => {
-    try {
-      const response = await userService.getUserById(userId, token);
-      setChatWithUser(response.data);
-      setShowUserChat(true);
-      setShowUserPanel(false); // Optionally close the user panel
-    } catch (error) {
-      console.error('Failed to get user info:', error);
-      showStatusMessage('Failed to start chat', 3000);
-    }
-  };
-  
-  const handleCloseUserChat = () => {
-    setShowUserChat(false);
-    setChatWithUser(null);
-  };
-  
-  const handleStartGroupChat = async () => {
-    if (!currentGroup) {
-      showStatusMessage('You need to be in a group to start a group chat', 3000);
-      return;
-    }
-    
-    try {
-      const response = await groupService.getGroupById(currentGroup, token);
-      setGroupChatData(response.data);
-      setShowGroupChat(true);
-    } catch (error) {
-      console.error('Failed to get group info:', error);
-      showStatusMessage('Failed to start group chat', 3000);
-    }
-  };
-  
-  const handleCloseGroupChat = () => {
-    setShowGroupChat(false);
-    setGroupChatData(null);
-  };
-
   return (
-    <div className="main-window">
-      <div className="title-bar">
-        <div className="title-bar-text">LUNCH Application</div>
-        <div className="title-bar-controls">
-          <button aria-label="Minimize"></button>
-          <button aria-label="Maximize"></button>
-          <button aria-label="Close"></button>
-        </div>
-      </div>
-      
-      <div className="window-body">
-        <div className="top-section">
-          <div className="menu-bar">
-            <div className="menu-item">
-              <button 
-                onClick={isLoggedIn ? handleLogout : handleLoginClick}
-                className="menu-button"
-              >
-                {isLoggedIn ? 'Logout' : 'Login'}
-              </button>
-            </div>
-            
-            {isLoggedIn && (
-              <>
-                <div className="menu-item">
-                  <button 
-                    onClick={handleStartGroupChat}
-                    className="menu-button"
-                  >
-                    Group Chat
-                  </button>
-                </div>
-                
-                {isAdmin && (
-                  <div className="menu-item dropdown">
-                    <button className="menu-button">Administer</button>
-                    <div className="dropdown-content">
-                      <button onClick={handleRestaurantPanelToggle}>Restaurants</button>
-                      <button onClick={handleUserPanelToggle}>Users</button>
-                      <button onClick={handleGroupPanelToggle}>Groups</button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+    <div className="main-window-container">
+      <div
+        className="main-window"
+        style={{
+          position: 'absolute',
+          top: `${position.y}px`,
+          left: `${position.x}px`
+        }}
+        ref={containerRef}
+      >
+        <div 
+          className="title-bar"
+          ref={dragHandleRef}
+        >
+          <div className="title-bar-text">LUNCH</div>
+          <div className="title-bar-controls">
+            <button aria-label="Minimize">_</button>
+            <button aria-label="Maximize">□</button>
+            <button aria-label="Close">×</button>
           </div>
-          <LEDIndicator confirmed={confirmed} currentUser={currentUser} />
         </div>
         
-        <div className="content">
+        <div className="window-body">
+          <div className="top-section">
+            <div className="menu-bar">
+              <div className="menu-item">
+                <button className="menu-button">{isLoggedIn ? 'File' : 'File'}</button>
+                <div className="dropdown-content">
+                  {isLoggedIn ? (
+                    <button onClick={handleLogout}>Logout</button>
+                  ) : (
+                    <button onClick={handleLoginClick}>Login</button>
+                  )}
+                </div>
+              </div>
+              
+              {isLoggedIn && (
+                <>
+                  <div className="menu-item">
+                    <button className="menu-button">Chat</button>
+                    <div className="dropdown-content">
+                      <button onClick={handleStartGroupChat}>Group Chat</button>
+                    </div>
+                  </div>
+                  
+                  {isAdmin && (
+                    <div className="menu-item">
+                      <button className="menu-button">Administer</button>
+                      <div className="dropdown-content">
+                        <button onClick={handleRestaurantPanelToggle}>Restaurants</button>
+                        <button onClick={handleUserPanelToggle}>Users</button>
+                        <button onClick={handleGroupPanelToggle}>Groups</button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {wsConnected && (
+              <div className="ws-indicator">●</div>
+            )}
+          </div>
+          
           <div className="application-content">
-            <RestaurantDisplay restaurantName={restaurantName} />
-            <VotingControls 
-              onVoteYes={handleVoteYes} 
-              onVoteNo={handleVoteNo} 
-              onNewRandom={handleNewRandom}
-              enabled={isLoggedIn && wsConnected}
-            />
+            {isLoggedIn ? (
+              <>
+                <RestaurantDisplay restaurantName={restaurantName} />
+                <div style={{ marginTop: '20px' }}>
+                  <LEDIndicator confirmed={confirmed} currentUser={currentUser} />
+                </div>
+                <VotingControls 
+                  onVoteYes={handleVoteYes} 
+                  onVoteNo={handleVoteNo} 
+                  onNewRandom={handleNewRandom}
+                  enabled={isLoggedIn && wsConnected}
+                />
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', marginTop: '40px', marginBottom: '40px' }}>
+                Please login to use the application
+              </div>
+            )}
           </div>
         </div>
+        
+        <StatusBar message={statusMessage} isVisible={showStatus} />
       </div>
       
-      <StatusBar 
-        message={statusMessage} 
-        isVisible={showStatus}
+      <LoginDialog
+        isVisible={showLoginDialog}
+        onLogin={handleLoginSubmit}
+        onCancel={handleLoginCancel}
       />
       
-      {showLoginDialog && (
-        <LoginDialog 
-          onLogin={handleLoginSubmit} 
-          onCancel={handleLoginCancel} 
-          isVisible={showLoginDialog}
-        />
-      )}
-      
-      {showRestaurantPanel && isLoggedIn && (
-        <RestaurantPanel 
-          token={token} 
-          onClose={() => setShowRestaurantPanel(false)} 
+      {showRestaurantPanel && (
+        <RestaurantPanel
+          token={token}
+          onClose={() => setShowRestaurantPanel(false)}
           isVisible={showRestaurantPanel}
           groupId={currentGroup || undefined}
         />
       )}
       
-      {showUserPanel && isLoggedIn && (
-        <UserPanel 
-          token={token} 
+      {showUserPanel && (
+        <UserPanel
+          token={token}
           onClose={() => setShowUserPanel(false)}
           onStartChat={handleStartUserChat}
           isVisible={showUserPanel}
@@ -410,10 +435,10 @@ const MainWindow: React.FC = () => {
         />
       )}
       
-      {showGroupPanel && isLoggedIn && (
-        <GroupPanel 
-          token={token} 
-          onClose={() => setShowGroupPanel(false)} 
+      {showGroupPanel && (
+        <GroupPanel
+          token={token}
+          onClose={() => setShowGroupPanel(false)}
           isVisible={showGroupPanel}
           currentUserId={currentUserId}
           currentGroupId={currentGroup || undefined}
@@ -422,7 +447,7 @@ const MainWindow: React.FC = () => {
       )}
       
       {showUserChat && chatWithUser && (
-        <UserChat 
+        <UserChat
           recipient={chatWithUser}
           onClose={handleCloseUserChat}
         />

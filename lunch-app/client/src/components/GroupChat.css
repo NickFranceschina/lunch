@@ -9,10 +9,11 @@
   border-right-color: #848484;
   border-bottom-color: #848484;
   background-color: #c0c0c0;
-  z-index: 1000;
+  z-index: 1100 !important;
   font-family: 'Tahoma', sans-serif;
   font-size: 11px;
   box-shadow: none;
+  pointer-events: auto !important;
 }
 
 .group-chat-header {
@@ -25,6 +26,7 @@
   font-weight: bold;
   font-size: 12px;
   height: 18px;
+  cursor: move;
 }
 
 .group-chat-header .close-button {
@@ -45,6 +47,8 @@
   font-size: 12px;
   padding: 0;
   margin: 0;
+  position: relative;
+  z-index: 1200;
 }
 
 .group-chat-header .close-button:active {
@@ -146,6 +150,11 @@
   margin: 6px;
   font-size: 10px;
   color: #ff0000;
+}
+
+/* Ensure all child elements are clickable */
+.group-chat-window * {
+  pointer-events: auto !important;
 }
 
 /* The rest of the styling is inherited from UserChat.css */ 

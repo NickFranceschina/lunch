@@ -24,7 +24,15 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { authState } = useAuth();
   const { connected, sendMessage, addMessageListener } = useWebSocket();
-  const { position, containerRef, dragHandleRef } = useDraggable({ x: window.innerWidth - 420, y: window.innerHeight - 520 });
+  const chatHeight = 500; // Fixed height of chat window
+  
+  // Position at bottom left
+  const initialPosition = {
+    x: 20, // Left side with padding
+    y: window.innerHeight - chatHeight - 5 // 5px from bottom of screen
+  };
+  
+  const { position, containerRef, dragHandleRef } = useDraggable(initialPosition, true);
   
   // Listen for incoming messages
   useEffect(() => {
@@ -117,24 +125,30 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
     setMessages(prev => [...prev, localMessage]);
     setNewMessage('');
   };
+
+  const handleCloseClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
   
   return (
     <div 
-      className="user-chat-window"
+      className="user-chat-window win98-draggable"
       style={{
         position: 'absolute',
         top: `${position.y}px`,
-        left: `${position.x}px`
+        left: `${position.x}px`,
+        zIndex: 1100
       }}
       ref={containerRef}
     >
       <div 
         className="user-chat-header"
         ref={dragHandleRef}
-        style={{ cursor: 'move' }}
       >
         <div className="chat-title">Chat with {recipient.username}</div>
-        <button className="close-button" onClick={onClose}>×</button>
+        <button className="close-button" onClick={handleCloseClick}>×</button>
       </div>
       
       <div className="chat-messages">
