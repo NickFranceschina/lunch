@@ -1,0 +1,35 @@
+# Version control
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log
+
+# Build artifacts
+client/build
+server/dist
+
+# Database files
+database/
+
+# Deployment files
+deploy.sh
+.last_deployed_commit
+
+# Docker files
+.dockerignore
+
+# Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Environment variables
+.env
+.env.* 
