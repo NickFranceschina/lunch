@@ -67,4 +67,18 @@ router.post('/:id/users/:userId', authenticateToken, isAdmin, groupController.ad
  */
 router.delete('/:id/users/:userId', authenticateToken, isAdmin, groupController.removeUserFromGroup);
 
+/**
+ * @route   GET /api/groups/:id/notification-time
+ * @desc    Get a group's notification time
+ * @access  Private
+ */
+router.get('/:id/notification-time', authenticateToken, groupController.getGroupNotificationTime);
+
+/**
+ * @route   PUT /api/groups/:id/notification-time
+ * @desc    Update a group's notification time
+ * @access  Private (Admin)
+ */
+router.put('/:id/notification-time', authenticateToken, isAdmin, groupController.updateGroupNotificationTime);
+
 export default router; 

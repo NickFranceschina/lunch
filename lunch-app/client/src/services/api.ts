@@ -320,6 +320,39 @@ export const groupService = {
     }
     
     return response.json();
+  },
+
+  // Get a group's notification time
+  getNotificationTime: async (groupId: number): Promise<{ notificationTime: string | null }> => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/notification-time`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get notification time');
+    }
+    
+    return response.json();
+  },
+
+  // Update a group's notification time
+  updateNotificationTime: async (groupId: number, notificationTime: string): Promise<{ message: string, notificationTime: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/notification-time`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ notificationTime }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update notification time');
+    }
+    
+    return response.json();
   }
 };
 

@@ -476,4 +476,93 @@ export const removeUserFromGroup = async (req: AuthRequest, res: Response) => {
       message: 'Server error'
     });
   }
+};
+
+/**
+ * Update a group's notification time
+ */
+export const updateGroupNotificationTime = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notificationTime } = req.body;
+    
+    if (!notificationTime) {
+      return res.status(400).json({ message: 'Notification time is required' });
+    }
+    
+    // Validate time format (HH:MM)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(notificationTime)) {
+      return res.status(400).json({ message: 'Invalid time format. Use HH:MM format (e.g., 12:30)' });
+    }
+    
+    const group = await groupRepository.findOne({ where: { id: parseInt(id) } });
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+    
+    // Create a Date object with today's date but with the specified time
+    const [hours, minutes] = notificationTime.split(':').map(Number);
+    
+    // Create today's date at midnight (to avoid timezone issues)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Add the specified hours and minutes
+    const timeObj = new Date(today);
+    timeObj.setHours(hours, minutes, 0, 0);
+    
+    console.log(`Setting notification time for group ${group.name} to:`, {
+      rawTime: notificationTime,
+      parsedHours: hours,
+      parsedMinutes: minutes,
+      dateObject: timeObj,
+      dateString: timeObj.toISOString(),
+      timeString: timeObj.toTimeString()
+    });
+    
+    // Update the group
+    group.notificationTime = timeObj;
+    await groupRepository.save(group);
+    
+    // After saving, fetch the group again to verify how the time was stored
+    const savedGroup = await groupRepository.findOne({ where: { id: parseInt(id) } });
+    console.log(`Verification - Group ${group.name} notification time stored as:`, {
+      rawValue: savedGroup?.notificationTime,
+      type: savedGroup?.notificationTime ? typeof savedGroup.notificationTime : 'undefined'
+    });
+    
+    res.status(200).json({ 
+      message: 'Group notification time updated successfully',
+      notificationTime: timeObj.toTimeString().slice(0, 5),
+      hours,
+      minutes
+    });
+  } catch (error) {
+    console.error('Error updating group notification time:', error);
+    res.status(500).json({ message: 'Error updating group notification time' });
+  }
+};
+
+/**
+ * Get a group's notification time
+ */
+export const getGroupNotificationTime = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const group = await groupRepository.findOne({ where: { id: parseInt(id) } });
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+    
+    res.status(200).json({ 
+      notificationTime: group.notificationTime ? group.notificationTime.toTimeString().slice(0, 5) : null
+    });
+  } catch (error) {
+    console.error('Error getting group notification time:', error);
+    res.status(500).json({ message: 'Error getting group notification time' });
+  }
 }; 

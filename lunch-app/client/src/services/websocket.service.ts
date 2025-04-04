@@ -333,87 +333,122 @@ class WebSocketService {
    * @param message Parsed message from the server
    */
   private handleMessage(message: any): void {
-    const { type, data } = message;
-    
-    if (!type) {
-      console.warn('Received message without type:', message);
+    // Check for duplicate messages (in case of reconnection)
+    if (message.id && this.processedMessageIds.has(message.id)) {
+      console.log('Ignoring duplicate message:', message.id);
       return;
     }
     
-    // For chat messages, generate a message ID to prevent duplicates
-    if (type === 'chat_message' && data) {
-      // Make message ID include the recipient info to prevent filtering messages meant for different recipients
-      let messageId;
+    // Add message ID to processed set if it has one
+    if (message.id) {
+      this.processedMessageIds.add(message.id);
       
-      if (data.isGroupChat) {
-        // For group messages, use group ID in the message ID
-        messageId = `${data.timestamp || ''}-${data.userId || data.senderId || ''}-${data.groupId || ''}-${(data.message || '').substring(0, 10)}`;
-      } else {
-        // For direct messages, include both sender and recipient
-        messageId = `${data.timestamp || ''}-${data.userId || data.senderId || ''}-to-${data.targetId || ''}-${(data.message || '').substring(0, 10)}`;
-      }
-      
-      // Log more detailed info for debugging message routing
-      console.log('WEBSOCKET SERVICE - Received message:', { 
-        type, 
-        messageId,
-        isChatMessage: true,
-        isGroupChat: data.isGroupChat,
-        senderId: data.userId || data.senderId,
-        recipientId: data.targetId || data.groupId,
-        content: data.message,
-        alreadyProcessed: this.processedMessageIds.has(messageId)
-      });
-      
-      if (this.processedMessageIds.has(messageId)) {
-        console.log('WebSocketService - Skipping duplicate message:', messageId);
-        return;
-      }
-      
-      this.processedMessageIds.add(messageId);
-      
-      // Cap the size of the set to prevent memory leaks
+      // Limit the size of the processed IDs set to avoid memory issues
       if (this.processedMessageIds.size > 1000) {
-        // Remove the oldest entries (convert to array, slice, convert back to set)
-        this.processedMessageIds = new Set(
-          Array.from(this.processedMessageIds).slice(-500)
-        );
+        const idsToRemove = Array.from(this.processedMessageIds).slice(0, 500);
+        idsToRemove.forEach(id => this.processedMessageIds.delete(id));
       }
-    } else {
-      console.log('WebSocketService - Processing non-chat message:', { type });
+    }
+    
+    // Log all incoming messages
+    console.log('WebSocket message received:', message);
+    
+    // Handle different message types
+    switch (message.type) {
+      case 'connection_established':
+        console.log('WebSocket connection established with server');
+        break;
+        
+      case 'pong':
+        console.log('Pong response received');
+        break;
+        
+      case 'vote_update':
+        console.log('Vote update received:', message.data);
+        break;
+        
+      case 'restaurant_selection':
+        console.log('Restaurant selection received:', message.data);
+        break;
+        
+      case 'notification':
+        console.log('Notification received:', message.data);
+        
+        // Show notifications using the browser's Notification API if permission granted
+        if (Notification.permission === 'granted') {
+          const notification = new Notification('Lunch App', {
+            body: message.data.message,
+            icon: '/logo192.png'
+          });
+          
+          // Close notification after 5 seconds
+          setTimeout(() => notification.close(), 5000);
+        }
+        break;
+        
+      case 'chat_message':
+        console.log('Chat message received:', message.data);
+        break;
+        
+      case 'user_presence_update':
+        console.log('User presence update received:', message.data);
+        break;
+        
+      case 'lunch_time_popup':
+        console.log('Lunch time popup received:', message.data);
+        
+        // Display notification
+        if (Notification.permission === 'granted') {
+          const notification = new Notification('It\'s Lunch Time!', {
+            body: `${message.data.message}\nToday's suggestion: ${message.data.restaurant}`,
+            icon: '/logo192.png'
+          });
+          
+          // Focus window when notification is clicked
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+        }
+        
+        // Focus the window/tab to make the app "pop up"
+        window.focus();
+        
+        // Dispatch a custom event to notify components about lunch time
+        window.dispatchEvent(new CustomEvent('lunch:time', {
+          detail: message.data
+        }));
+        break;
+      
+      case 'error':
+        console.error('Error from WebSocket server:', message.data);
+        break;
+        
+      default:
+        console.log('Unknown message type:', message.type);
     }
     
     // Notify all listeners for this message type
-    const listeners = this.messageListeners[type] || [];
-    console.log(`WEBSOCKET SERVICE - Broadcasting message to ${listeners.length} listeners for type "${type}"`);
-    
-    if (listeners.length === 0) {
-      console.warn(`WEBSOCKET SERVICE - No listeners found for message type "${type}"`);
+    if (this.messageListeners[message.type]) {
+      this.messageListeners[message.type].forEach(callback => {
+        try {
+          callback(message.data);
+        } catch (error) {
+          console.error(`Error in ${message.type} message listener:`, error);
+        }
+      });
     }
     
-    listeners.forEach((callback, index) => {
-      try {
-        console.log(`WEBSOCKET SERVICE - Calling listener ${index + 1}/${listeners.length} for type "${type}"`);
-        callback(data);
-        console.log(`WEBSOCKET SERVICE - Listener ${index + 1} executed successfully`);
-      } catch (error) {
-        console.error(`WEBSOCKET SERVICE - Error in message listener ${index + 1} for type "${type}":`, error);
-      }
-    });
-    
-    // Also notify "all" listeners
-    const allListeners = this.messageListeners['all'] || [];
-    if (allListeners.length > 0) {
-      console.log(`WEBSOCKET SERVICE - Also notifying ${allListeners.length} "all" listeners`);
+    // Also notify generic message listeners
+    if (this.messageListeners['*']) {
+      this.messageListeners['*'].forEach(callback => {
+        try {
+          callback(message);
+        } catch (error) {
+          console.error('Error in wildcard message listener:', error);
+        }
+      });
     }
-    
-    allListeners.forEach((callback, index) => {
-      try {
-        callback(message);
-      } catch (error) {
-        console.error(`WEBSOCKET SERVICE - Error in "all" message listener ${index + 1}:`, error);
-      }
-    });
   }
 
   /**

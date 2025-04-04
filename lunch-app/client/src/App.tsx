@@ -15,6 +15,26 @@ function App() {
     sessionStorage.setItem('window_visibility_main', isMainWindowVisible.toString());
   }, [isMainWindowVisible]);
 
+  // Listen for lunch time events to show the window
+  useEffect(() => {
+    const handleLunchTimeEvent = (event: CustomEvent) => {
+      console.log('Lunch time event received:', event.detail);
+      
+      // Make window visible when it's lunch time
+      if (!isMainWindowVisible) {
+        setIsMainWindowVisible(true);
+      }
+    };
+
+    // Add event listener with type assertion
+    window.addEventListener('lunch:time', handleLunchTimeEvent as EventListener);
+
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.removeEventListener('lunch:time', handleLunchTimeEvent as EventListener);
+    };
+  }, [isMainWindowVisible]);
+
   const toggleMainWindowVisibility = () => {
     setIsMainWindowVisible(!isMainWindowVisible);
   };

@@ -8,7 +8,7 @@ interface Win98TaskbarProps {
 const Win98Taskbar: React.FC<Win98TaskbarProps> = ({ toggleMainWindowVisibility }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   
-  // Update clock every minute
+  // Update clock every second
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
@@ -20,8 +20,8 @@ const Win98Taskbar: React.FC<Win98TaskbarProps> = ({ toggleMainWindowVisibility 
     // Update immediately
     updateClock();
     
-    // Set interval for updates
-    const interval = setInterval(updateClock, 60000);
+    // Set interval for updates - check every second to ensure minute changes are caught promptly
+    const interval = setInterval(updateClock, 1000);
     
     // Clean up interval on unmount
     return () => clearInterval(interval);

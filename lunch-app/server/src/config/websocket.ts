@@ -7,6 +7,7 @@ import { Group } from '../models/Group';
 import { GroupRestaurant } from '../models/GroupRestaurant';
 import { Restaurant } from '../models/Restaurant';
 import { User } from '../models/User';
+import { Between, LessThanOrEqual, MoreThanOrEqual, Not, IsNull } from 'typeorm';
 
 // Initialize repositories
 const groupRepository = AppDataSource.getRepository(Group);
@@ -30,6 +31,7 @@ interface WebSocketClient extends WebSocket {
 class WebSocketServer {
   wss: WebSocket.Server;
   clients: Set<WebSocketClient> = new Set();
+  lunchTimeChecker: NodeJS.Timeout | null = null;
 
   constructor(server: http.Server) {
     // Add CORS support to WebSocket server
@@ -43,6 +45,7 @@ class WebSocketServer {
       }
     });
     this.init();
+    this.startLunchTimeChecker();
   }
 
   /**
@@ -622,7 +625,7 @@ class WebSocketServer {
    * Get information about a group
    * @param groupId The group ID
    */
-  async getGroupInfo(groupId: number): Promise<{ currentRestaurant?: string } | null> {
+  async getGroupInfo(groupId: number): Promise<{ currentRestaurant?: string, name?: string } | null> {
     try {
       const group = await groupRepository.findOne({
         where: { id: groupId },
@@ -630,10 +633,19 @@ class WebSocketServer {
       });
       
       if (!group) {
+        console.error(`Failed to find group with ID: ${groupId}`);
         return null;
       }
       
+      console.log(`Group info for ${groupId}:`, {
+        name: group.name,
+        hasCurrentRestaurant: !!group.currentRestaurant,
+        currentRestaurantId: group.currentRestaurant?.id,
+        currentRestaurantName: group.currentRestaurant?.name
+      });
+      
       return {
+        name: group.name,
         currentRestaurant: group.currentRestaurant?.name
       };
     } catch (error) {
@@ -641,18 +653,185 @@ class WebSocketServer {
       return null;
     }
   }
+
+  /**
+   * Starts the cron-like job that checks for upcoming lunch times
+   * and notifies groups when it's time for lunch
+   */
+  startLunchTimeChecker() {
+    console.log('Starting lunch time checker...');
+    
+    // Run one check immediately after server starts
+    setTimeout(() => {
+      console.log('Running initial lunch time check');
+      this.checkGroupLunchTimes().catch(err => 
+        console.error('Error in initial lunch time check:', err)
+      );
+    }, 5000);
+    
+    // Check every minute
+    this.lunchTimeChecker = setInterval(async () => {
+      try {
+        await this.checkGroupLunchTimes();
+      } catch (error) {
+        console.error('Error in lunch time checker:', error);
+      }
+    }, 60000); // Check every minute
+
+    console.log('Lunch time checker started - will check every minute');
+  }
+
+  /**
+   * Stops the lunch time checker interval
+   */
+  stopLunchTimeChecker() {
+    if (this.lunchTimeChecker) {
+      clearInterval(this.lunchTimeChecker);
+      this.lunchTimeChecker = null;
+      console.log('Lunch time checker stopped');
+    }
+  }
+  
+  /**
+   * Manually trigger a lunch time check (for testing)
+   * This can be exposed through an admin API endpoint
+   */
+  async manualLunchTimeCheck(): Promise<void> {
+    console.log('Manual lunch time check triggered');
+    try {
+      await this.checkGroupLunchTimes();
+      console.log('Manual lunch time check completed');
+    } catch (error) {
+      console.error('Error in manual lunch time check:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Checks for groups that have a notification time matching the current time
+   * and sends a random restaurant selection to those groups
+   */
+  async checkGroupLunchTimes() {
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
+    console.log(`Checking for lunch times at ${currentTime}`);
+
+    try {
+      // Find all groups with notification time matching current time (just compare hours and minutes)
+      const groups = await groupRepository.find({
+        relations: ['users', 'currentRestaurant'],
+        where: {
+          notificationTime: Not(IsNull())
+        }
+      });
+
+      console.log(`Found ${groups.length} groups with notification times set`);
+      
+      for (const group of groups) {
+        if (!group.notificationTime) continue;
+        
+        // Handle different time formats safely - convert to string first if needed
+        let groupHours: number | undefined;
+        let groupMinutes: number | undefined;
+        let groupTime: string;
+        
+        try {
+          // Try to use as Date object first
+          if (typeof group.notificationTime.getHours === 'function') {
+            groupHours = group.notificationTime.getHours();
+            groupMinutes = group.notificationTime.getMinutes();
+          } 
+          // If it's a string in ISO format, parse it
+          else if (typeof group.notificationTime === 'string') {
+            const timeParts = (group.notificationTime as string).split(':');
+            if (timeParts.length >= 2) {
+              groupHours = parseInt(timeParts[0], 10);
+              groupMinutes = parseInt(timeParts[1], 10);
+            }
+          }
+          // If it's stored in another format, try to convert it to a date
+          else {
+            console.log(`Group ${group.id} notification time format:`, typeof group.notificationTime, group.notificationTime);
+            const dateObj = new Date(group.notificationTime as any);
+            if (!isNaN(dateObj.getTime())) {
+              groupHours = dateObj.getHours();
+              groupMinutes = dateObj.getMinutes();
+            } else {
+              console.error(`Cannot parse notification time for group ${group.name}:`, group.notificationTime);
+              continue;
+            }
+          }
+          
+          // Skip if we couldn't determine hours or minutes
+          if (groupHours === undefined || groupMinutes === undefined) {
+            console.error(`Could not extract hours/minutes for group ${group.name}:`, group.notificationTime);
+            continue;
+          }
+          
+          groupTime = `${groupHours.toString().padStart(2, '0')}:${groupMinutes.toString().padStart(2, '0')}`;
+        } catch (error) {
+          console.error(`Error parsing notification time for group ${group.name}:`, error);
+          console.log('Notification time value:', group.notificationTime);
+          continue;
+        }
+        
+        const currentHours = now.getHours();
+        const currentMinutes = now.getMinutes();
+        const currentTimeStr = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
+        
+        console.log(`Group: ${group.name}, Group time: ${groupTime}, Current time: ${currentTimeStr}`);
+        
+        if (groupHours === currentHours && groupMinutes === currentMinutes) {
+          console.log(`It's lunch time for group: ${group.name} at ${groupTime}!`);
+          
+          // Select a random restaurant for this group
+          await this.processNewRandomRequest(group.id);
+          
+          // Get the updated group info with the selected restaurant
+          const updatedGroup = await this.getGroupInfo(group.id);
+          
+          if (updatedGroup && updatedGroup.currentRestaurant) {
+            console.log(`Selected restaurant for group ${group.name}: ${updatedGroup.currentRestaurant}`);
+            
+            // Send notification to all users in the group
+            this.sendGroupNotification(
+              group.id,
+              `It's lunch time! Today's restaurant suggestion: ${updatedGroup.currentRestaurant}`
+            );
+            
+            // Send popup command to all clients in the group
+            this.broadcastToGroup(group.id, {
+              type: 'lunch_time_popup',
+              data: {
+                groupId: group.id,
+                groupName: group.name,
+                restaurant: updatedGroup.currentRestaurant,
+                message: `It's lunch time for ${group.name}!`
+              }
+            });
+            
+            console.log(`Sent lunch time notification to ${group.users?.length || 0} users in group ${group.name}`);
+          } else {
+            console.error(`Failed to get restaurant for group: ${group.name}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking group lunch times:', error);
+    }
+  }
 }
 
-// Export singleton instance that will be initialized with server
-let wsServer: WebSocketServer | null = null;
+// Global server instance for access from other modules
+let wsServerInstance: WebSocketServer | null = null;
 
 export const initWebSocketServer = (server: http.Server): WebSocketServer => {
-  if (!wsServer) {
-    wsServer = new WebSocketServer(server);
+  if (!wsServerInstance) {
+    wsServerInstance = new WebSocketServer(server);
   }
-  return wsServer;
+  return wsServerInstance;
 };
 
 export const getWebSocketServer = (): WebSocketServer | null => {
-  return wsServer;
+  return wsServerInstance;
 }; 

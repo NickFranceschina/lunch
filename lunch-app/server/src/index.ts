@@ -55,6 +55,113 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
+// Test endpoint to manually trigger lunch time check (only for testing)
+app.post('/api/test/trigger-lunch-check', (req: Request, res: Response) => {
+  const wsServer = require('./config/websocket').getWebSocketServer();
+  
+  if (!wsServer) {
+    return res.status(500).json({ 
+      success: false, 
+      message: 'WebSocket server not initialized' 
+    });
+  }
+  
+  try {
+    wsServer.manualLunchTimeCheck()
+      .then(() => {
+        res.json({ 
+          success: true, 
+          message: 'Lunch time check triggered successfully' 
+        });
+      })
+      .catch((error: any) => {
+        console.error('Error in manual lunch time check:', error);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Error triggering lunch time check', 
+          error: error.message 
+        });
+      });
+  } catch (error: any) {
+    console.error('Error triggering lunch time check:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error triggering lunch time check', 
+      error: error.message 
+    });
+  }
+});
+
+// Test endpoint to check a specific group's notification time format
+app.get('/api/test/group-time/:groupId', async (req: Request, res: Response) => {
+  try {
+    const { groupId } = req.params;
+    const AppDataSource = require('./config/database').AppDataSource;
+    const groupRepository = AppDataSource.getRepository('Group');
+    
+    const group = await groupRepository.findOne({ 
+      where: { id: parseInt(groupId) } 
+    });
+    
+    if (!group) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Group not found' 
+      });
+    }
+    
+    // Get current time for comparison
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTimeStr = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
+    
+    // Analyze the notification time
+    type TimeInfo = {
+      rawValue: any;
+      type: string;
+      hasGetHours: boolean;
+      currentTime: string;
+      hours?: number;
+      minutes?: number;
+      formatted?: string;
+      matchesCurrent?: boolean;
+    };
+    
+    let notificationTimeInfo: TimeInfo = {
+      rawValue: group.notificationTime,
+      type: typeof group.notificationTime,
+      hasGetHours: typeof group.notificationTime?.getHours === 'function',
+      currentTime: currentTimeStr
+    };
+    
+    // Try to extract hours and minutes if possible
+    if (notificationTimeInfo.hasGetHours) {
+      notificationTimeInfo.hours = group.notificationTime.getHours();
+      notificationTimeInfo.minutes = group.notificationTime.getMinutes();
+      notificationTimeInfo.formatted = `${group.notificationTime.getHours().toString().padStart(2, '0')}:${group.notificationTime.getMinutes().toString().padStart(2, '0')}`;
+      notificationTimeInfo.matchesCurrent = group.notificationTime.getHours() === currentHours && 
+                    group.notificationTime.getMinutes() === currentMinutes;
+    }
+    
+    res.json({
+      success: true,
+      group: {
+        id: group.id,
+        name: group.name
+      },
+      notificationTime: notificationTimeInfo
+    });
+  } catch (error: any) {
+    console.error('Error checking group notification time:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking group notification time',
+      error: error.message
+    });
+  }
+});
+
 // Initialize TypeORM and start server
 AppDataSource.initialize()
     .then(async () => {
