@@ -318,6 +318,33 @@ const MainWindow: React.FC = () => {
     return () => clearTimeout(timer);
   }, []); // Only run on mount, not when resetPosition changes
 
+  // Add useEffect to check for existing session on component mount
+  useEffect(() => {
+    // Check if there's a valid session in sessionStorage
+    const storedToken = sessionStorage.getItem('token');
+    const storedUserId = sessionStorage.getItem('userId');
+    const storedUsername = sessionStorage.getItem('username');
+    const storedIsAdmin = sessionStorage.getItem('isAdmin');
+    const storedGroupId = sessionStorage.getItem('groupId');
+    
+    // If we have the basic session data, restore the session
+    if (storedToken && storedUserId && storedUsername) {
+      console.log('Restoring session for user:', storedUsername);
+      setIsLoggedIn(true);
+      setCurrentUser(storedUsername);
+      setCurrentUserId(parseInt(storedUserId, 10));
+      setToken(storedToken);
+      setIsAdmin(storedIsAdmin === 'true');
+      
+      // Restore group if available
+      if (storedGroupId) {
+        setCurrentGroup(parseInt(storedGroupId, 10));
+      }
+      
+      showStatusMessage(`Welcome back, ${storedUsername}!`);
+    }
+  }, []); // Empty dependency array means this runs once on mount
+
   // Handle login
   const handleLoginClick = () => {
     setShowLoginDialog(true);
@@ -325,9 +352,13 @@ const MainWindow: React.FC = () => {
 
   const handleLoginSubmit = async (username: string, password: string) => {
     try {
-      const response = await authService.login(username, password);
+      // Trim username and password to prevent errors from whitespace
+      const trimmedUsername = username.trim();
+      const trimmedPassword = password.trim();
+      
+      const response = await authService.login(trimmedUsername, trimmedPassword);
       setIsLoggedIn(true);
-      setCurrentUser(username);
+      setCurrentUser(trimmedUsername);
       setCurrentUserId(response.user.id);
       setToken(response.token);
       setIsAdmin(response.user.isAdmin);
@@ -339,13 +370,19 @@ const MainWindow: React.FC = () => {
         setCurrentGroup(response.user.groups[0].id);
       }
       
-      // Save token and user data to localStorage for reconnection
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('userId', response.user.id.toString());
-      localStorage.setItem('username', username);
+      // Save token and user data to sessionStorage for reconnection
+      sessionStorage.setItem('token', response.token);
+      sessionStorage.setItem('userId', response.user.id.toString());
+      sessionStorage.setItem('username', trimmedUsername);
+      sessionStorage.setItem('isAdmin', response.user.isAdmin.toString());
+      if (response.user.currentGroupId) {
+        sessionStorage.setItem('groupId', response.user.currentGroupId.toString());
+      } else if (response.user.groups && response.user.groups.length > 0) {
+        sessionStorage.setItem('groupId', response.user.groups[0].id.toString());
+      }
       
       setShowLoginDialog(false);
-      showStatusMessage(`Welcome, ${username}!`);
+      showStatusMessage(`Welcome, ${trimmedUsername}!`);
     } catch (error) {
       console.error('Login failed:', error);
       showStatusMessage('Login failed. Please check your credentials.', 5000);
@@ -372,6 +409,15 @@ const MainWindow: React.FC = () => {
       // Reset connection state first
       setWsConnected(false);
       
+      // Close all chat and administration windows
+      setShowRestaurantPanel(false);
+      setShowUserPanel(false);
+      setShowGroupPanel(false);
+      setShowUserChat(false);
+      setShowGroupChat(false);
+      setChatWithUser(null);
+      setGroupChatData(null);
+      
       // Then clear auth state
       setIsLoggedIn(false);
       setCurrentUser('');
@@ -382,10 +428,12 @@ const MainWindow: React.FC = () => {
       setToken('');
       setIsAdmin(false);
       
-      // Clear localStorage data
-      localStorage.removeItem('token');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('username');
+      // Clear sessionStorage data
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('userId');
+      sessionStorage.removeItem('username');
+      sessionStorage.removeItem('isAdmin');
+      sessionStorage.removeItem('groupId');
       
       showStatusMessage('You have been logged out');
     } catch (error) {

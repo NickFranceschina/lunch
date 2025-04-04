@@ -25,12 +25,20 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
   - [x] Login/logout functionality
   - [x] Role-based menu access (admin restricted)
   - [x] Token handling
+  - [x] Session persistence using sessionStorage
+  - [x] Tab-specific session management
+  - [x] Input validation (trimming credentials)
 - [x] Implement real-time updates using WebSocket:
   - [x] Restaurant selection broadcasting
   - [x] Vote counting and confirmation
   - [x] User presence tracking
   - [x] Status notifications
   - [x] Chat messages
+- [x] Improve user experience:
+  - [x] Auto-closing admin panels on logout
+  - [x] Auto-closing chat windows on logout
+  - [x] Session restoration on page refresh
+  - [x] Input validation for better error prevention
 - [ ] Add responsive design for modern screen resolutions
 
 ### 2. Backend (Node.js + TypeScript)
@@ -62,8 +70,13 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 ### 4. Authentication & Security
 - [x] Implement modern authentication system
 - [x] Add user session management
+  - [x] Session persistence across page refresh
+  - [x] Tab-specific sessions with sessionStorage
+  - [x] Automatic cleanup on tab close
 - [x] Implement role-based access control
 - [x] Add input validation and sanitization
+  - [x] Trim credentials during login
+  - [x] Validate user inputs
 - [x] Implement secure WebSocket connections with JWT authentication
 
 ### 5. Configuration Management
@@ -97,7 +110,7 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 - Backend: Node.js + Express + TypeScript
 - Database: SQLite (changed from PostgreSQL for easier local development)
 - Real-time: WebSocket with JWT authentication
-- Authentication: JWT
+- Authentication: JWT with sessionStorage persistence
 - Testing: Jest + React Testing Library
 - Containerization: Docker
 - CI/CD: GitHub Actions
@@ -120,6 +133,8 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
    - [x] Added status bar for messages
    - [x] Implemented WebSocket for real-time updates
    - [x] Implemented chat functionality (user-to-user and group chat)
+   - [x] Enhanced authentication with session persistence
+   - [x] Improved UX with automatic window management
 5. [x] Migrate existing data
 6. [ ] Test thoroughly
 7. [ ] Deploy to production
@@ -140,20 +155,26 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 - User management interface is complete with real-time user presence indicators
 - Group management interface is complete with user management functionality
 - Admin interface access is properly restricted to admin users
-- Authentication flow works correctly (login/logout) with proper token handling
+- Authentication flow works correctly with session persistence between page refreshes
 - API endpoints for users, groups, and restaurants are implemented
 - Voting system is functional with real-time updates
 - Random restaurant selection broadcasts to all group members in real-time
 - Chat functionality is implemented (both user-to-user and group chat)
+- Input validation prevents common user errors
+- Automatic window management improves the user experience during logout
 
 ## Next Steps
 1. ✅ Implement WebSocket for real-time updates (COMPLETED)
 2. ✅ Add chat functionality (COMPLETED):
    - ✅ Create chat backend endpoints
    - ✅ Develop user chat and group chat components
-3. Set up testing framework and write tests
-4. Implement error handling and logging
-5. Create deployment configuration
+3. ✅ Improve authentication with session persistence (COMPLETED):
+   - ✅ Implement sessionStorage-based token storage
+   - ✅ Add automatic session restoration
+   - ✅ Improve input validation
+4. Set up testing framework and write tests
+5. Implement error handling and logging
+6. Create deployment configuration
 
 ## Notes
 - Maintain the original black background with white text theme
@@ -171,4 +192,5 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 - Email notifications
 - Restaurant ratings and reviews
 - Integration with restaurant APIs
-- Advanced group management features 
+- Advanced group management features
+- Remember user group selection between sessions 

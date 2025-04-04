@@ -28,9 +28,12 @@ The modernization is well underway with the following features implemented:
   - Live vote tracking and confirmation
   - User presence and status indicators
   - Notifications in the status bar
+  - Chat messaging (both direct and group)
 - Full group management with user addition/removal functionality
 - Administrator functionality for user and restaurant management
-- Secure JWT-based authentication and WebSocket connections
+- Secure session-based authentication with WebSocket connections
+- User session persistence across page refreshes
+- Automatic window management (closing panels/chats on logout)
 
 ## Repository Structure
 
@@ -87,11 +90,21 @@ npm start
    - User presence tracking for administrators
    - Status bar replacing alert() dialogs for notifications
    - Role-based access control for admin functionality
+   - Session persistence across page refreshes (tab-specific)
+   - Direct and group chat functionality
+   - Automatic window management
 
 6. Next Steps:
-   - Chat functionality implementation (coming soon)
    - Testing infrastructure
    - Deployment configuration
+
+## Authentication
+
+The application uses sessionStorage-based authentication which:
+- Preserves login state across page refreshes
+- Automatically logs out users when they close the browser tab
+- Provides better security than localStorage by limiting session scope
+- Supports multiple users on different tabs of the same browser
 
 ## Contributing
 
