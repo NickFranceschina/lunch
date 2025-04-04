@@ -439,4 +439,25 @@ export const userService = {
     
     return response.json();
   }
+};
+
+// System service
+export const systemService = {
+  getSystemInfo: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/system/info`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to get system information');
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching system info:', error);
+      return {
+        success: false,
+        message: 'Failed to get system information'
+      };
+    }
+  }
 }; 

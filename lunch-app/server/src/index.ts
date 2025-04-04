@@ -13,6 +13,7 @@ import userRoutes from './routes/user.routes';
 import groupRoutes from './routes/group.routes';
 import restaurantRoutes from './routes/restaurant.routes';
 import chatRoutes from './routes/chat.routes';
+import systemRoutes from './routes/system.routes';
 
 const app: Express = express();
 const port = process.env.PORT || 3001;
@@ -47,6 +48,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/system', systemRoutes);
 
 // Test endpoint to manually trigger lunch time check (only for testing)
 app.post('/api/test/trigger-lunch-check', (req: Request, res: Response) => {

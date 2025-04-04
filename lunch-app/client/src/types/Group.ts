@@ -2,6 +2,12 @@ export interface Group {
   id: number;
   name: string;
   description?: string;
+  notificationTime?: string;
+  users?: { id: number; username: string }[];
+  currentRestaurant?: any;
+  isConfirmed?: boolean;
+  yesVotes?: number;
+  noVotes?: number;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -319,4 +319,12 @@
 
 .cancel-button:hover {
   background-color: #666;
+}
+
+.timezone-label {
+  margin-left: 5px;
+  font-size: 0.8em;
+  color: #777;
+  white-space: nowrap;
+  cursor: help;
 } 

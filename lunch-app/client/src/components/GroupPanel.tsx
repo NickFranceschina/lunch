@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { groupService, userService } from '../services/api';
+import { groupService, userService, systemService } from '../services/api';
 import './GroupPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
@@ -66,6 +66,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'details' | 'members'>('details');
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const [serverTimezone, setServerTimezone] = useState<{ name?: string; offsetString?: string; shortOffset: string } | null>(null);
   
   // Use position in the center of the screen
   const initialPosition = {
@@ -80,6 +81,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     if (isVisible) {
       fetchGroups();
       fetchAllUsers(); // Fetch all users for adding
+      fetchServerTimezone(); // Fetch server timezone
     }
   }, [isVisible]);
 
@@ -113,6 +115,24 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       setError(err.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch server timezone
+  const fetchServerTimezone = async () => {
+    try {
+      const response = await systemService.getSystemInfo();
+      if (response.success) {
+        // Save both the timezone name and offset string for different display options
+        setServerTimezone({
+          name: response.data.timezone.name,
+          offsetString: response.data.timezone.offsetString,
+          // Create a shortened version without minutes if they're 00
+          shortOffset: response.data.timezone.offsetString.replace(/:00$/, '')
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching server timezone:', err);
     }
   };
 
@@ -503,14 +523,25 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                     
                     <div className="win98-form-row">
                       <label className="win98-label" htmlFor="notificationTime">Notification Time:</label>
-                      <input
-                        className="win98-input"
-                        type="time"
-                        id="notificationTime"
-                        name="notificationTime"
-                        value={formData.notificationTime}
-                        onChange={handleInputChange}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                        <input
+                          className="win98-input"
+                          type="time"
+                          id="notificationTime"
+                          name="notificationTime"
+                          value={formData.notificationTime}
+                          onChange={handleInputChange}
+                          style={{ flex: 1 }}
+                        />
+                        {serverTimezone && (
+                          <span 
+                            className="timezone-label" 
+                            title={serverTimezone.name || serverTimezone.offsetString}
+                          >
+                            ({serverTimezone.shortOffset})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="win98-panel-footer">
@@ -577,14 +608,25 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                           
                           <div className="win98-form-row">
                             <label className="win98-label" htmlFor="notificationTime">Notification Time:</label>
-                            <input
-                              className="win98-input"
-                              type="time"
-                              id="notificationTime"
-                              name="notificationTime"
-                              value={formData.notificationTime}
-                              onChange={handleInputChange}
-                            />
+                            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                              <input
+                                className="win98-input"
+                                type="time"
+                                id="notificationTime"
+                                name="notificationTime"
+                                value={formData.notificationTime}
+                                onChange={handleInputChange}
+                                style={{ flex: 1 }}
+                              />
+                              {serverTimezone && (
+                                <span 
+                                  className="timezone-label" 
+                                  title={serverTimezone.name || serverTimezone.offsetString}
+                                >
+                                  ({serverTimezone.shortOffset})
+                                </span>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="win98-form-row">
@@ -621,7 +663,17 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                           
                           <div className="win98-form-row">
                             <span className="win98-label">Notification Time:</span>
-                            <span>{formatTime(selectedGroup.notificationTime)}</span>
+                            <span style={{ display: 'flex', alignItems: 'center' }}>
+                              <span style={{ flex: 1 }}>{formatTime(selectedGroup.notificationTime)}</span>
+                              {serverTimezone && (
+                                <span 
+                                  className="timezone-label"
+                                  title={serverTimezone.name || serverTimezone.offsetString}
+                                >
+                                  ({serverTimezone.shortOffset})
+                                </span>
+                              )}
+                            </span>
                           </div>
                           
                           <div className="win98-form-row">
