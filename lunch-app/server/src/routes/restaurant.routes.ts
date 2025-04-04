@@ -6,7 +6,8 @@ import {
   updateRestaurant, 
   deleteRestaurant,
   getRandomRestaurant,
-  voteForRestaurant
+  voteForRestaurant,
+  getCurrentRestaurant
 } from '../controllers/restaurant.controller';
 import { authenticateToken, isAdmin } from '../middleware/auth.middleware';
 
@@ -18,6 +19,7 @@ router.use('/group/:groupId', groupRouter);
 
 // Group-specific routes (now using the group router)
 groupRouter.get('/random', authenticateToken, getRandomRestaurant);
+groupRouter.get('/current', authenticateToken, getCurrentRestaurant);
 groupRouter.post('/vote', authenticateToken, voteForRestaurant);
 
 /**

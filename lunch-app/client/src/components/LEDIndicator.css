@@ -25,4 +25,9 @@
 .led-green {
   background-color: #00FF00;
   box-shadow: 0 0 8px #00FF00;
+}
+
+.led-yellow {
+  background-color: #FFFF00;
+  box-shadow: 0 0 8px #FFFF00;
 } 

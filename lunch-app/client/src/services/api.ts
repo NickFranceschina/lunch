@@ -57,6 +57,22 @@ export const restaurantService = {
     return response.json();
   },
   
+  getCurrentRestaurant: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/current`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get current restaurant');
+    }
+    
+    return response.json();
+  },
+  
   voteYes: async (groupId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/vote`, {
       method: 'POST',

@@ -309,8 +309,13 @@ export const voteForRestaurant = async (req: AuthRequest, res: Response) => {
       group.noVotes += 1;
     }
     
-    // Check if the restaurant is confirmed (more yes than no votes)
-    const isConfirmed = group.yesVotes > group.noVotes;
+    // Calculate total votes
+    const totalVotes = group.yesVotes + group.noVotes;
+    
+    // Check if the restaurant is confirmed:
+    // 1. More yes than no votes
+    // 2. At least 2 total votes required for confirmation (prevent single vote confirmation)
+    const isConfirmed = group.yesVotes > group.noVotes && totalVotes >= 2;
     const wasConfirmedBefore = group.isConfirmed;
     group.isConfirmed = isConfirmed;
     
@@ -361,6 +366,55 @@ export const voteForRestaurant = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Error voting for restaurant'
+    });
+  }
+};
+
+/**
+ * Get the current restaurant selection for a group
+ */
+export const getCurrentRestaurant = async (req: AuthRequest, res: Response) => {
+  try {
+    const { groupId } = req.params;
+    
+    // Verify the group exists
+    const group = await groupRepository.findOne({
+      where: { id: parseInt(groupId) },
+      relations: ['currentRestaurant']
+    });
+    
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+    
+    // If there's no current restaurant selection
+    if (!group.currentRestaurant) {
+      return res.status(200).json({
+        success: true,
+        message: 'No current restaurant selection',
+        restaurant: null,
+        isConfirmed: false,
+        yesVotes: 0,
+        noVotes: 0
+      });
+    }
+    
+    // Return the current restaurant along with vote status
+    res.status(200).json({
+      success: true,
+      restaurant: group.currentRestaurant,
+      isConfirmed: group.isConfirmed,
+      yesVotes: group.yesVotes,
+      noVotes: group.noVotes
+    });
+  } catch (error) {
+    console.error('Error getting current restaurant:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving current restaurant'
     });
   }
 }; 

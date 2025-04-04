@@ -263,8 +263,10 @@ class WebSocketService {
     try {
       const payload = {
         type,
-        ...data,
-        timestamp: data.timestamp || new Date().toISOString()
+        data: {
+          ...data,
+          timestamp: data.timestamp || new Date().toISOString()
+        }
       };
       
       console.log('WebSocket sending message:', payload);

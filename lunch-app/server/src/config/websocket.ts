@@ -183,15 +183,65 @@ class WebSocketServer {
         
       case 'vote':
         // Handle voting and broadcast to relevant clients
-        if (message.data && message.data.vote !== undefined) {
-          this.broadcastToGroup(client.groupId || 0, {
-            type: 'vote_update',
+        console.log('Received vote message:', {
+          data: message.data,
+          vote: message.data?.vote,
+          clientId: client.userId,
+          clientUsername: client.username,
+          clientGroup: client.groupId
+        });
+        
+        if (message.data && message.data.vote !== undefined && client.groupId) {
+          // Process the vote in the database
+          this.processVote(client.groupId, client.userId || 0, client.username || 'Unknown', message.data.vote)
+            .then(async ({ yesVotes, noVotes, isConfirmed }) => {
+              // Broadcast the updated vote counts to the group
+              this.broadcastToGroup(client.groupId || 0, {
+                type: 'vote_update',
+                data: {
+                  userId: client.userId,
+                  username: client.username,
+                  vote: message.data.vote,
+                  yesVotes,
+                  noVotes,
+                  isConfirmed
+                }
+              });
+              
+              // If confirmation status changed, update restaurant selection
+              const group = await this.getGroupInfo(client.groupId || 0);
+              if (group && group.currentRestaurant && isConfirmed) {
+                this.sendRestaurantSelection(
+                  client.groupId || 0,
+                  group.currentRestaurant,
+                  isConfirmed
+                );
+                
+                // Send a notification about confirmation
+                this.sendGroupNotification(
+                  client.groupId || 0,
+                  `Restaurant "${group.currentRestaurant}" has been confirmed!`
+                );
+              }
+            })
+            .catch(error => {
+              console.error('Error processing vote:', error);
+              // Send error message back to client
+              client.send(JSON.stringify({
+                type: 'error',
+                data: {
+                  message: 'Failed to process your vote'
+                }
+              }));
+            });
+        } else {
+          console.error('Invalid vote message format or missing group ID:', message.data);
+          client.send(JSON.stringify({
+            type: 'error',
             data: {
-              userId: client.userId,
-              username: client.username,
-              vote: message.data.vote
+              message: 'Invalid vote format or you are not in a group'
             }
-          });
+          }));
         }
         break;
         
@@ -507,6 +557,89 @@ class WebSocketServer {
         timestamp: new Date().toISOString()
       }
     });
+  }
+
+  /**
+   * Process a vote from a client
+   * @param groupId The group ID
+   * @param userId The user ID
+   * @param username The username
+   * @param vote True for yes, false for no
+   */
+  async processVote(groupId: number, userId: number, username: string, vote: boolean): Promise<{
+    yesVotes: number,
+    noVotes: number,
+    isConfirmed: boolean
+  }> {
+    try {
+      // Find the group
+      const group = await groupRepository.findOne({
+        where: { id: groupId },
+        relations: ['currentRestaurant']
+      });
+      
+      if (!group) {
+        throw new Error(`Group with ID ${groupId} not found`);
+      }
+      
+      if (!group.currentRestaurant) {
+        throw new Error('No current restaurant to vote for');
+      }
+      
+      // Update vote count
+      if (vote) {
+        group.yesVotes += 1;
+      } else {
+        group.noVotes += 1;
+      }
+      
+      // Calculate total votes
+      const totalVotes = group.yesVotes + group.noVotes;
+      
+      // Check if the restaurant is confirmed: 
+      // 1. More yes than no votes 
+      // 2. At least 2 total votes required for confirmation (prevent single vote confirmation)
+      const isConfirmed = group.yesVotes > group.noVotes && totalVotes >= 2;
+      const wasConfirmedBefore = group.isConfirmed;
+      group.isConfirmed = isConfirmed;
+      
+      // Save the updated group
+      await groupRepository.save(group);
+      
+      // Return the updated vote counts
+      return {
+        yesVotes: group.yesVotes,
+        noVotes: group.noVotes,
+        isConfirmed
+      };
+    } catch (error) {
+      console.error('Error processing vote:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get information about a group
+   * @param groupId The group ID
+   */
+  async getGroupInfo(groupId: number): Promise<{ currentRestaurant?: string } | null> {
+    try {
+      const group = await groupRepository.findOne({
+        where: { id: groupId },
+        relations: ['currentRestaurant']
+      });
+      
+      if (!group) {
+        return null;
+      }
+      
+      return {
+        currentRestaurant: group.currentRestaurant?.name
+      };
+    } catch (error) {
+      console.error('Error getting group info:', error);
+      return null;
+    }
   }
 }
 

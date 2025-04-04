@@ -32,6 +32,9 @@ const MainWindow: React.FC = () => {
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [showStatus, setShowStatus] = useState<boolean>(false);
+  const [yesVotes, setYesVotes] = useState<number>(0);
+  const [noVotes, setNoVotes] = useState<number>(0);
+  const [hasVoted, setHasVoted] = useState<boolean>(false);
   
   // Chat state
   const [showUserChat, setShowUserChat] = useState<boolean>(false);
@@ -160,14 +163,59 @@ const MainWindow: React.FC = () => {
           console.log('MainWindow - WebSocket connected successfully');
           showStatusMessage('Connected to server');
           
+          // Fetch current restaurant and vote counts if user is part of a group
+          if (currentGroup) {
+            // First, check if there's an active restaurant selection
+            try {
+              console.log('Fetching current restaurant selection for group:', currentGroup);
+              restaurantService.getCurrentRestaurant(currentGroup, token)
+                .then((response: { 
+                  restaurant: { name: string },
+                  isConfirmed: boolean,
+                  yesVotes: number,
+                  noVotes: number
+                }) => {
+                  if (response.restaurant) {
+                    console.log('Current restaurant selection:', response.restaurant);
+                    setRestaurantName(response.restaurant.name);
+                    setConfirmed(response.isConfirmed);
+                    setYesVotes(response.yesVotes || 0);
+                    setNoVotes(response.noVotes || 0);
+                    // Don't set hasVoted to true here, so the new user can still vote
+                  }
+                })
+                .catch((error: Error) => {
+                  console.error('Failed to fetch current restaurant:', error);
+                  // Non-critical error, don't show to user
+                });
+            } catch (error) {
+              console.error('Error requesting current restaurant:', error);
+            }
+          }
+          
           // Add event listeners after successful connection
           const selectionUnsubscribe = websocketService.addMessageListener('restaurant_selection', (data: any) => {
             setRestaurantName(data.restaurantName);
             setConfirmed(data.confirmed);
+            setYesVotes(0);
+            setNoVotes(0);
+            setHasVoted(false);
           });
           
           const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
             console.log('MainWindow - Vote update:', data);
+            if (data.yesVotes !== undefined) {
+              setYesVotes(data.yesVotes);
+            }
+            if (data.noVotes !== undefined) {
+              setNoVotes(data.noVotes);
+            }
+            if (data.isConfirmed !== undefined) {
+              setConfirmed(data.isConfirmed);
+            }
+            if (data.userId === currentUserId) {
+              setHasVoted(true);
+            }
           });
           
           const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
@@ -208,6 +256,12 @@ const MainWindow: React.FC = () => {
             }
           });
           
+          // Add listener for error messages from the server
+          const errorUnsubscribe = websocketService.addMessageListener('error', (data: any) => {
+            console.error('MainWindow - Received error from server:', data);
+            showStatusMessage(`Error: ${data.message || 'Unknown error'}`, 5000);
+          });
+          
           // Setup ping interval
           pingInterval = setInterval(() => {
             if (websocketService.isConnected()) {
@@ -222,6 +276,7 @@ const MainWindow: React.FC = () => {
             voteUnsubscribe();
             notificationUnsubscribe();
             chatUnsubscribe();
+            errorUnsubscribe();
             clearInterval(pingInterval);
             
             // Only disconnect if no active chat windows (this was causing the disconnection issue)
@@ -347,11 +402,15 @@ const MainWindow: React.FC = () => {
       // Send vote through WebSocket
       websocketService.sendVote(true);
       showStatusMessage('Your vote was cast');
+      setHasVoted(true);
     } else {
       // Fallback to REST API
       try {
         const response = await restaurantService.voteYes(currentGroup, token);
         setConfirmed(response.isConfirmed);
+        setYesVotes(response.yesVotes || yesVotes + 1);
+        setNoVotes(response.noVotes || noVotes);
+        setHasVoted(true);
         showStatusMessage('Your vote was cast');
       } catch (error) {
         console.error('Failed to vote yes:', error);
@@ -367,11 +426,15 @@ const MainWindow: React.FC = () => {
       // Send vote through WebSocket
       websocketService.sendVote(false);
       showStatusMessage('Your vote was cast');
+      setHasVoted(true);
     } else {
       // Fallback to REST API
       try {
         const response = await restaurantService.voteNo(currentGroup, token);
         setConfirmed(response.isConfirmed);
+        setYesVotes(response.yesVotes || yesVotes);
+        setNoVotes(response.noVotes || noVotes + 1);
+        setHasVoted(true);
         showStatusMessage('Your vote was cast');
       } catch (error) {
         console.error('Failed to vote no:', error);
@@ -387,12 +450,18 @@ const MainWindow: React.FC = () => {
       // Send new random request through WebSocket
       websocketService.sendNewRandom(currentGroup);
       showStatusMessage('Selecting a new random restaurant...');
+      setYesVotes(0);
+      setNoVotes(0);
+      setHasVoted(false);
     } else {
       // Fallback to REST API
       try {
         const response = await restaurantService.getRandomRestaurant(currentGroup, token);
         setRestaurantName(response.restaurant.name);
         setConfirmed(false);
+        setYesVotes(0);
+        setNoVotes(0);
+        setHasVoted(false);
         showStatusMessage('Selected a new random restaurant');
       } catch (error) {
         console.error('Failed to get random restaurant:', error);
@@ -472,13 +541,28 @@ const MainWindow: React.FC = () => {
               <>
                 <RestaurantDisplay restaurantName={restaurantName} />
                 <div style={{ marginTop: '20px' }}>
-                  <LEDIndicator confirmed={confirmed} currentUser={currentUser} />
+                  <LEDIndicator 
+                    confirmed={confirmed} 
+                    currentUser={currentUser}
+                    yesVotes={yesVotes}
+                    noVotes={noVotes}
+                  />
                 </div>
+                
+                {currentGroup && (
+                  <div className="vote-counts">
+                    <span>Yes Votes: {yesVotes}</span>
+                    <span> | </span>
+                    <span>No Votes: {noVotes}</span>
+                  </div>
+                )}
+                
                 <VotingControls 
                   onVoteYes={handleVoteYes} 
                   onVoteNo={handleVoteNo} 
                   onNewRandom={handleNewRandom}
-                  enabled={isLoggedIn && wsConnected}
+                  enabled={isLoggedIn && wsConnected && !hasVoted && restaurantName !== '' && !confirmed}
+                  newRandomEnabled={isLoggedIn && wsConnected}
                 />
               </>
             ) : (

@@ -3,6 +3,7 @@ import './VotingControls.css';
 
 interface VotingControlsProps {
   enabled: boolean;
+  newRandomEnabled: boolean;
   onVoteYes: () => void;
   onVoteNo: () => void;
   onNewRandom: () => void;
@@ -10,6 +11,7 @@ interface VotingControlsProps {
 
 const VotingControls: React.FC<VotingControlsProps> = ({
   enabled,
+  newRandomEnabled,
   onVoteYes,
   onVoteNo,
   onNewRandom
@@ -32,7 +34,7 @@ const VotingControls: React.FC<VotingControlsProps> = ({
       </button>
       <button 
         className="vote-button" 
-        disabled={!enabled}
+        disabled={!newRandomEnabled}
         onClick={onNewRandom}
       >
         New Random
