@@ -71,14 +71,52 @@ const MainWindow: React.FC = () => {
   };
 
   const handleStartGroupChat = async () => {
-    if (!currentGroup) return;
+    if (!currentGroup) {
+      console.error('Cannot start group chat: No current group selected');
+      showStatusMessage('Unable to start group chat: No group selected', 3000);
+      return;
+    }
+    
+    console.log('Starting group chat for group ID:', currentGroup);
+    
+    // Ensure WebSocket connection is active before opening chat
+    if (!websocketService.isConnected() && token) {
+      console.log('MainWindow - Ensuring WebSocket connection before opening chat');
+      try {
+        await websocketService.connect(token);
+        setWsConnected(websocketService.isConnected());
+      } catch (error) {
+        console.error('MainWindow - Failed to connect WebSocket before chat:', error);
+        // Continue anyway, the GroupChat will try to reconnect
+      }
+    }
     
     try {
-      const groupData = await groupService.getGroupById(currentGroup, token);
+      const response = await groupService.getGroupById(currentGroup, token);
+      
+      if (!response.success || !response.data) {
+        console.error('Failed to get group data:', response);
+        showStatusMessage('Unable to load group chat data', 3000);
+        return;
+      }
+      
+      const groupData = response.data;
+      
+      // Validate group data
+      if (!groupData.id) {
+        console.error('Invalid group data received:', groupData);
+        showStatusMessage('Invalid group data received', 3000);
+        return;
+      }
+      
+      console.log('Loaded group data for chat:', groupData);
+      
+      // Don't disconnect WebSocket when opening chat
       setGroupChatData(groupData);
       setShowGroupChat(true);
     } catch (error) {
       console.error('Failed to get group data:', error);
+      showStatusMessage('Failed to load group chat', 3000);
     }
   };
 
@@ -107,13 +145,19 @@ const MainWindow: React.FC = () => {
     let pingInterval: NodeJS.Timeout | undefined;
     
     if (isLoggedIn && token) {
-      console.log("Attempting WebSocket connection with token:", token.substring(0, 10) + "...");
+      console.log("MainWindow - Attempting WebSocket connection with token:", token.substring(0, 10) + "...");
+      
+      // Clean up any existing message listeners before reconnecting
+      websocketService.clearMessageListeners('restaurant_selection');
+      websocketService.clearMessageListeners('vote_update');
+      websocketService.clearMessageListeners('notification');
+      websocketService.clearMessageListeners('chat_message');
       
       // Connect to WebSocket
       websocketService.connect(token)
         .then(() => {
           setWsConnected(true);
-          console.log('WebSocket connected successfully');
+          console.log('MainWindow - WebSocket connected successfully');
           showStatusMessage('Connected to server');
           
           // Add event listeners after successful connection
@@ -123,7 +167,7 @@ const MainWindow: React.FC = () => {
           });
           
           const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
-            console.log('Vote update:', data);
+            console.log('MainWindow - Vote update:', data);
           });
           
           const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
@@ -131,10 +175,36 @@ const MainWindow: React.FC = () => {
           });
           
           const chatUnsubscribe = websocketService.addMessageListener('chat_message', (data: any) => {
+            console.log('MainWindow - Received chat notification for message:', data);
+            
+            // Enhanced handling of incoming chat messages
             if (data.groupId) {
-              showStatusMessage(`New group chat message from ${data.senderName}`, 3000);
+              // This is a group chat message
+              console.log('MainWindow - Received group message:', {
+                groupId: data.groupId,
+                currentGroup: currentGroup,
+                chatOpen: showGroupChat,
+                sender: data.senderName || data.username,
+                content: data.message?.substring(0, 20) + (data.message?.length > 20 ? '...' : '')
+              });
+              
+              // Show notification
+              showStatusMessage(`New group chat message from ${data.senderName || data.username}`, 3000);
+              
+              // Auto-open group chat window when a group message is received
+              // and this message belongs to our current group
+              if (!showGroupChat && currentGroup === data.groupId) {
+                console.log('Auto-opening group chat for message from:', 
+                  data.senderName || data.username);
+                
+                handleStartGroupChat();
+              }
             } else {
-              showStatusMessage(`New chat message from ${data.senderName}`, 3000);
+              // This is a direct message
+              showStatusMessage(`New chat message from ${data.senderName || data.username}`, 3000);
+              
+              // Could add handling for direct messages here too
+              console.log('MainWindow - Received direct message from:', data.senderName || data.username);
             }
           });
           
@@ -147,30 +217,43 @@ const MainWindow: React.FC = () => {
           
           // Create cleanup function
           cleanupFunction = () => {
+            console.log("MainWindow - Cleaning up event listeners");
             selectionUnsubscribe();
             voteUnsubscribe();
             notificationUnsubscribe();
             chatUnsubscribe();
             clearInterval(pingInterval);
-            websocketService.disconnect();
-            setWsConnected(false);
+            
+            // Only disconnect if no active chat windows (this was causing the disconnection issue)
+            if (!showGroupChat && !showUserChat) {
+              console.log("MainWindow - Cleaning up WebSocket connection - no active chat windows");
+              websocketService.disconnect();
+              setWsConnected(false);
+            } else {
+              console.log("MainWindow - Keeping WebSocket connection active for chat windows");
+            }
           };
         })
         .catch(error => {
-          console.error('WebSocket connection failed:', error);
+          console.error('MainWindow - WebSocket connection failed:', error);
           setWsConnected(false);
           showStatusMessage('Failed to connect to server', 5000);
         });
+    } else if (!isLoggedIn && websocketService.isConnected()) {
+      // Ensure connection is closed when user logs out
+      console.log("MainWindow - Disconnecting WebSocket due to logout");
+      websocketService.disconnect();
+      setWsConnected(false);
     }
     
     // Return cleanup function
     return () => {
       if (cleanupFunction) {
-        console.log("Cleaning up WebSocket connection");
+        console.log("MainWindow - Unmounting, cleaning up WebSocket listeners");
         cleanupFunction();
       }
     };
-  }, [isLoggedIn, token]);
+  }, [isLoggedIn, token, currentGroup, showGroupChat, showUserChat]);
 
   // Reset position when component mounts
   useEffect(() => {
@@ -201,8 +284,10 @@ const MainWindow: React.FC = () => {
         setCurrentGroup(response.user.groups[0].id);
       }
       
-      // Save token to localStorage for reconnection
+      // Save token and user data to localStorage for reconnection
       localStorage.setItem('token', response.token);
+      localStorage.setItem('userId', response.user.id.toString());
+      localStorage.setItem('username', username);
       
       setShowLoginDialog(false);
       showStatusMessage(`Welcome, ${username}!`);
@@ -242,18 +327,15 @@ const MainWindow: React.FC = () => {
       setToken('');
       setIsAdmin(false);
       
-      // Finally remove token from localStorage
+      // Clear localStorage data
       localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('username');
+      
       showStatusMessage('You have been logged out');
     } catch (error) {
       console.error('Logout failed:', error);
       showStatusMessage('Logout failed', 5000);
-      
-      // Still clear local state even if the API call fails
-      setIsLoggedIn(false);
-      setWsConnected(false);
-      setToken('');
-      localStorage.removeItem('token');
     }
   };
 

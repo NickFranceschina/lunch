@@ -7,6 +7,28 @@ class WebSocketService {
   private reconnectInterval: number = 5000; // 5 seconds
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnecting: boolean = false;
+  private lastConnectionState: boolean = false;
+  private processedMessageIds: Set<string> = new Set<string>();
+
+  /**
+   * Broadcast connection status change to all components
+   */
+  private broadcastConnectionStatus(connected: boolean): void {
+    if (this.lastConnectionState !== connected) {
+      console.log('WebSocketService - Broadcasting connection change:', { 
+        from: this.lastConnectionState, 
+        to: connected 
+      });
+      
+      // Save the new state
+      this.lastConnectionState = connected;
+      
+      // Dispatch a custom event that components can listen for
+      window.dispatchEvent(new CustomEvent('websocket:connection_changed', {
+        detail: connected
+      }));
+    }
+  }
 
   /**
    * Connect to the WebSocket server
@@ -14,17 +36,51 @@ class WebSocketService {
    */
   connect(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+      // If already connected, just resolve
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        console.log('WebSocket already connected, reusing connection');
+        this.broadcastConnectionStatus(true);
         resolve();
         return;
       }
-
+      
+      // If connecting, wait for it to complete
       if (this.isConnecting) {
-        resolve();
+        console.log('WebSocket connection already in progress, waiting...');
+        
+        // Add a listener for the connection event to resolve when connected
+        const connectionListener = (event: CustomEvent) => {
+          if (event.detail === true) {
+            window.removeEventListener('websocket:connection_changed', connectionListener as EventListener);
+            resolve();
+          }
+        };
+        
+        window.addEventListener('websocket:connection_changed', connectionListener as EventListener);
+        
+        // Also set a timeout in case the connection attempt fails
+        setTimeout(() => {
+          window.removeEventListener('websocket:connection_changed', connectionListener as EventListener);
+          // Don't reject, just resolve to avoid blocking the UI
+          resolve();
+        }, 5000);
+        
         return;
       }
 
       this.isConnecting = true;
+      
+      // Cleanup any existing socket that might be in a bad state
+      if (this.socket) {
+        try {
+          console.log('Cleaning up existing socket in state:', 
+            ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.socket.readyState]);
+          this.socket.close();
+          this.socket = null;
+        } catch (e) {
+          console.error('Error cleaning up existing socket:', e);
+        }
+      }
       
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = process.env.REACT_APP_WS_HOST || window.location.hostname;
@@ -42,13 +98,34 @@ class WebSocketService {
         this.socket = new WebSocket(url);
         console.log('WebSocket instance created, connection pending...');
         
+        // Set a connection timeout
+        const connectionTimeout = setTimeout(() => {
+          if (this.isConnecting) {
+            console.error('WebSocket connection timeout after 10 seconds');
+            this.isConnecting = false;
+            if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
+              this.socket.close();
+              this.socket = null;
+            }
+            this.broadcastConnectionStatus(false);
+            // Don't reject, just resolve to avoid blocking UI
+            resolve();
+          }
+        }, 10000);
+        
         this.socket.onopen = () => {
           console.log('WebSocket connection established');
           this.isConnecting = false;
+          clearTimeout(connectionTimeout);
+          
           if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
           }
+          
+          // Broadcast connection success
+          this.broadcastConnectionStatus(true);
+          
           resolve();
         };
         
@@ -70,8 +147,15 @@ class WebSocketService {
             timestamp: new Date().toISOString(),
             browserInfo: navigator.userAgent
           });
+          
+          clearTimeout(connectionTimeout);
           this.isConnecting = false;
-          reject(error);
+          
+          // Broadcast connection failure
+          this.broadcastConnectionStatus(false);
+          
+          // Don't reject, just resolve to avoid blocking UI
+          resolve();
         };
         
         this.socket.onclose = (event) => {
@@ -82,8 +166,13 @@ class WebSocketService {
             reason: event.reason || 'No reason provided',
             timestamp: new Date().toISOString()
           });
+          
+          clearTimeout(connectionTimeout);
           this.isConnecting = false;
           this.socket = null;
+          
+          // Broadcast disconnection
+          this.broadcastConnectionStatus(false);
           
           // Attempt to reconnect if not closed intentionally
           if (event.code !== 1000) {
@@ -94,7 +183,12 @@ class WebSocketService {
       } catch (error) {
         console.error('Error creating WebSocket:', error);
         this.isConnecting = false;
-        reject(error);
+        
+        // Broadcast connection failure
+        this.broadcastConnectionStatus(false);
+        
+        // Don't reject, just resolve to avoid blocking UI
+        resolve();
       }
     });
   }
@@ -103,18 +197,44 @@ class WebSocketService {
    * Disconnect from the WebSocket server
    */
   disconnect(): void {
-    if (this.socket) {
-      this.socket.close(1000, 'Disconnecting');
-      this.socket = null;
-    }
+    console.log('WebSocket disconnect requested');
     
+    // Clear any pending reconnection attempts
     if (this.reconnectTimer) {
+      console.log('Clearing pending reconnect attempt');
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
     
-    // Clear all message listeners
+    // Clear connecting state if in progress
+    if (this.isConnecting) {
+      this.isConnecting = false;
+    }
+    
+    if (this.socket) {
+      try {
+        console.log('Closing WebSocket connection');
+        // Use code 1000 to indicate normal closure
+        this.socket.close(1000, 'Disconnected by user');
+        this.socket = null;
+        this.broadcastConnectionStatus(false);
+        console.log('WebSocket disconnected successfully');
+      } catch (error) {
+        console.error('Error during WebSocket disconnect:', error);
+        // Ensure socket is nullified even if there was an error
+        this.socket = null;
+        this.broadcastConnectionStatus(false);
+      }
+    } else {
+      console.log('No active WebSocket connection to disconnect');
+    }
+    
+    // Clear all message listeners to prevent memory leaks
     this.messageListeners = {};
+    
+    // Clear the processed message IDs set
+    this.processedMessageIds.clear();
+    console.log('Cleared processed message tracking');
   }
 
   /**
@@ -122,14 +242,37 @@ class WebSocketService {
    * @param type Message type
    * @param data Message data
    */
-  sendMessage(type: string, data: any): void {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      console.error('Cannot send message: WebSocket not connected');
-      return;
+  sendMessage(type: string, data: any = {}): void {
+    if (!this.socket) {
+      console.error('Cannot send message: Socket not connected');
+      throw new Error('WebSocket not connected');
     }
     
-    const message = JSON.stringify({ type, data });
-    this.socket.send(message);
+    // Include current user ID and username from localStorage as a fallback
+    if (!data.userId) {
+      const storedUserId = localStorage.getItem('userId');
+      if (storedUserId) {
+        data.userId = parseInt(storedUserId, 10);
+      }
+    }
+    
+    if (!data.username) {
+      data.username = localStorage.getItem('username') || 'User';
+    }
+    
+    try {
+      const payload = {
+        type,
+        ...data,
+        timestamp: data.timestamp || new Date().toISOString()
+      };
+      
+      console.log('WebSocket sending message:', payload);
+      this.socket.send(JSON.stringify(payload));
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
   }
 
   /**
@@ -143,7 +286,21 @@ class WebSocketService {
       this.messageListeners[type] = [];
     }
     
+    // Don't add duplicate listeners - check by stringifying the function
+    const callbackStr = callback.toString();
+    const isDuplicate = this.messageListeners[type].some(
+      existing => existing.toString() === callbackStr
+    );
+    
+    if (isDuplicate) {
+      console.log(`Prevented adding duplicate listener for message type: ${type}`);
+      // Return a no-op function for cleanup
+      return () => {};
+    }
+    
     this.messageListeners[type].push(callback);
+    
+    console.log(`Added listener for ${type}, now has ${this.messageListeners[type].length} listeners`);
     
     // Return a function to remove this listener
     return () => {
@@ -152,9 +309,21 @@ class WebSocketService {
         const index = this.messageListeners[type].indexOf(callback);
         if (index !== -1) {
           this.messageListeners[type].splice(index, 1);
+          console.log(`Removed listener for ${type}, now has ${this.messageListeners[type].length} listeners`);
         }
       }
     };
+  }
+
+  /**
+   * Remove all listeners for a specific message type
+   * @param type Message type to clear listeners for
+   */
+  clearMessageListeners(type: string): void {
+    if (this.messageListeners[type]) {
+      console.log(`Clearing all listeners for message type: ${type}`);
+      this.messageListeners[type] = [];
+    }
   }
 
   /**
@@ -169,23 +338,78 @@ class WebSocketService {
       return;
     }
     
+    // For chat messages, generate a message ID to prevent duplicates
+    if (type === 'chat_message' && data) {
+      // Make message ID include the recipient info to prevent filtering messages meant for different recipients
+      let messageId;
+      
+      if (data.isGroupChat) {
+        // For group messages, use group ID in the message ID
+        messageId = `${data.timestamp || ''}-${data.userId || data.senderId || ''}-${data.groupId || ''}-${(data.message || '').substring(0, 10)}`;
+      } else {
+        // For direct messages, include both sender and recipient
+        messageId = `${data.timestamp || ''}-${data.userId || data.senderId || ''}-to-${data.targetId || ''}-${(data.message || '').substring(0, 10)}`;
+      }
+      
+      // Log more detailed info for debugging message routing
+      console.log('WEBSOCKET SERVICE - Received message:', { 
+        type, 
+        messageId,
+        isChatMessage: true,
+        isGroupChat: data.isGroupChat,
+        senderId: data.userId || data.senderId,
+        recipientId: data.targetId || data.groupId,
+        content: data.message,
+        alreadyProcessed: this.processedMessageIds.has(messageId)
+      });
+      
+      if (this.processedMessageIds.has(messageId)) {
+        console.log('WebSocketService - Skipping duplicate message:', messageId);
+        return;
+      }
+      
+      this.processedMessageIds.add(messageId);
+      
+      // Cap the size of the set to prevent memory leaks
+      if (this.processedMessageIds.size > 1000) {
+        // Remove the oldest entries (convert to array, slice, convert back to set)
+        this.processedMessageIds = new Set(
+          Array.from(this.processedMessageIds).slice(-500)
+        );
+      }
+    } else {
+      console.log('WebSocketService - Processing non-chat message:', { type });
+    }
+    
     // Notify all listeners for this message type
     const listeners = this.messageListeners[type] || [];
-    listeners.forEach(callback => {
+    console.log(`WEBSOCKET SERVICE - Broadcasting message to ${listeners.length} listeners for type "${type}"`);
+    
+    if (listeners.length === 0) {
+      console.warn(`WEBSOCKET SERVICE - No listeners found for message type "${type}"`);
+    }
+    
+    listeners.forEach((callback, index) => {
       try {
+        console.log(`WEBSOCKET SERVICE - Calling listener ${index + 1}/${listeners.length} for type "${type}"`);
         callback(data);
+        console.log(`WEBSOCKET SERVICE - Listener ${index + 1} executed successfully`);
       } catch (error) {
-        console.error(`Error in message listener for type "${type}":`, error);
+        console.error(`WEBSOCKET SERVICE - Error in message listener ${index + 1} for type "${type}":`, error);
       }
     });
     
     // Also notify "all" listeners
     const allListeners = this.messageListeners['all'] || [];
-    allListeners.forEach(callback => {
+    if (allListeners.length > 0) {
+      console.log(`WEBSOCKET SERVICE - Also notifying ${allListeners.length} "all" listeners`);
+    }
+    
+    allListeners.forEach((callback, index) => {
       try {
         callback(message);
       } catch (error) {
-        console.error('Error in "all" message listener:', error);
+        console.error(`WEBSOCKET SERVICE - Error in "all" message listener ${index + 1}:`, error);
       }
     });
   }
@@ -194,7 +418,23 @@ class WebSocketService {
    * Check if WebSocket is currently connected
    */
   isConnected(): boolean {
-    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+    const connected = this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+    
+    // Debug log connection status but only at specific intervals to avoid console spam
+    if (Date.now() % 5000 < 100) { // Log roughly every 5 seconds
+      console.debug('WebSocket connection check:', { 
+        connected, 
+        socketExists: this.socket !== null,
+        readyState: this.socket?.readyState,
+        readyStateText: this.socket ? 
+          ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.socket.readyState] : 'NO_SOCKET'
+      });
+    }
+    
+    // Broadcast any connection status change
+    this.broadcastConnectionStatus(connected);
+    
+    return connected;
   }
 
   /**
@@ -250,17 +490,80 @@ class WebSocketService {
   }
 
   /**
-   * Send a chat message to a user or group
+   * Send a chat message
    * @param message Message text
-   * @param targetId User ID or group ID
-   * @param isGroupChat Whether this is a group chat message
+   * @param targetId Target user or group ID
+   * @param isGroupChat Whether this is a group chat
    */
-  sendChatMessage(message: string, targetId: number, isGroupChat: boolean): void {
-    this.sendMessage('chat_message', {
+  sendChatMessage(message: string, targetId: number, isGroupChat = false): void {
+    console.log('WEBSOCKET SERVICE - sendChatMessage called with:', {
       message,
       targetId,
+      isGroupChat,
+      socketConnected: this.socket !== null
+    });
+    
+    if (!this.socket) {
+      console.error('WEBSOCKET SERVICE - Cannot send chat message: Socket not connected');
+      throw new Error('WebSocket not connected');
+    }
+    
+    if (!message || message.trim() === '') {
+      console.error('WEBSOCKET SERVICE - Cannot send empty message');
+      throw new Error('Message cannot be empty');
+    }
+    
+    if (!targetId) {
+      console.error('WEBSOCKET SERVICE - Cannot send message: No target ID provided');
+      throw new Error('Target ID is required');
+    }
+    
+    // Get current user information
+    const userId = localStorage.getItem('userId');
+    const username = localStorage.getItem('username');
+    
+    if (!userId) {
+      console.error('WEBSOCKET SERVICE - Cannot send message: No user ID available');
+      throw new Error('User ID is required');
+    }
+    
+    console.log('WEBSOCKET SERVICE - User info for message:', {
+      userId,
+      username,
+      targetId: targetId,
       isGroupChat
     });
+    
+    // Create unique timestamp for message
+    const timestamp = new Date().toISOString();
+    
+    // Generate a message ID for deduplication
+    const messageId = `${timestamp}-${userId}-${isGroupChat ? targetId : 'to-' + targetId}-${message.substring(0, 10)}`;
+    
+    try {
+      const payload = {
+        type: 'chat_message',
+        data: {
+          message: message.trim(),
+          targetId: targetId,
+          isGroupChat: isGroupChat,
+          timestamp: timestamp,
+          messageId: messageId,
+          // Include sender info explicitly
+          userId: parseInt(userId, 10),
+          username: username || 'User',
+          // FIXED: Always include the groupId explicitly when it's a group chat
+          groupId: isGroupChat ? targetId : undefined
+        }
+      };
+      
+      console.log('WEBSOCKET SERVICE - Sending chat message:', payload);
+      this.socket.send(JSON.stringify(payload));
+      console.log('WEBSOCKET SERVICE - Message sent successfully');
+    } catch (error) {
+      console.error('WEBSOCKET SERVICE - Error sending chat message:', error);
+      throw error;
+    }
   }
 }
 

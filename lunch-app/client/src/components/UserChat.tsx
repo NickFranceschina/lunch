@@ -3,6 +3,7 @@ import { useAuth, useWebSocket } from '../services';
 import { User } from '../types/User';
 import './UserChat.css';
 import useDraggable from '../hooks/useDraggable';
+import { websocketService } from '../services/websocket.service';
 
 interface ChatMessage {
   id?: number;
@@ -23,7 +24,8 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { authState } = useAuth();
-  const { connected, sendMessage, addMessageListener } = useWebSocket();
+  const { sendMessage, addMessageListener } = useWebSocket();
+  const [connectionError, setConnectionError] = useState<string>('');
   const chatHeight = 500; // Fixed height of chat window
   
   // Position at bottom left
@@ -33,6 +35,51 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
   };
   
   const { position, containerRef, dragHandleRef } = useDraggable(initialPosition, true);
+  
+  // Function to reconnect using existing MainWindow connection
+  const forceConnectionCheck = async () => {
+    try {
+      if (!websocketService.isConnected()) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          setConnectionError('Attempting to reconnect...');
+          await websocketService.connect(token);
+          if (websocketService.isConnected()) {
+            setConnectionError('');
+          } else {
+            setConnectionError('Reconnection failed');
+          }
+        } else {
+          setConnectionError('No authentication token available');
+        }
+      } else {
+        setConnectionError('');
+      }
+    } catch (error) {
+      console.error('UserChat - Connection check error:', error);
+      setConnectionError('Connection failed');
+    }
+  };
+
+  // Auto-reconnect on mount if needed
+  useEffect(() => {
+    if (!websocketService.isConnected()) {
+      console.log('UserChat - Auto-reconnecting on mount');
+      const token = localStorage.getItem('token');
+      if (token) {
+        setConnectionError('Connecting to server...');
+        websocketService.connect(token)
+          .then(() => {
+            console.log('UserChat - Auto-reconnection successful');
+            setConnectionError('');
+          })
+          .catch(error => {
+            console.error('UserChat - Auto-reconnection failed:', error);
+            setConnectionError('Connection failed. Click Reconnect to try again.');
+          });
+      }
+    }
+  }, []);
   
   // Listen for incoming messages
   useEffect(() => {
@@ -100,7 +147,7 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !connected || !authState.user) {
+    if (!newMessage.trim() || !websocketService.isConnected() || !authState.user) {
       return;
     }
     
@@ -182,20 +229,27 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type a message..."
           className="message-input"
-          disabled={!connected}
+          disabled={!websocketService.isConnected()}
         />
         <button 
           type="submit" 
           className="send-button"
-          disabled={!connected || !newMessage.trim()}
+          disabled={!websocketService.isConnected() || !newMessage.trim()}
         >
           Send
         </button>
       </form>
       
-      {!connected && (
+      {!websocketService.isConnected() && (
         <div className="connection-warning">
-          Not connected to chat server. Messages won't be sent.
+          Not connected to server. Messages will not be sent.
+          {connectionError && <div className="error-details">{connectionError}</div>}
+          <button 
+            onClick={forceConnectionCheck} 
+            style={{marginLeft: '5px', fontSize: '10px'}}
+          >
+            Reconnect
+          </button>
         </div>
       )}
     </div>

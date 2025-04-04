@@ -67,10 +67,21 @@ class WebSocketServer {
         try {
           const decoded: any = verify(token, JWT_SECRET);
           console.log('Token verified successfully for user:', decoded.username);
-          ws.userId = decoded.userId;
+          
+          // Fix: Correctly extract user data from decoded token
+          ws.userId = decoded.id || decoded.userId;
           ws.username = decoded.username;
           ws.isAdmin = decoded.isAdmin;
+          
+          // Fix: Ensure currentGroupId is properly extracted and set
           ws.groupId = decoded.currentGroupId;
+          
+          console.log('Client authenticated with:', {
+            userId: ws.userId,
+            username: ws.username,
+            isAdmin: ws.isAdmin,
+            groupId: ws.groupId
+          });
           
           // Update user login status in the database
           if (ws.userId) {
@@ -206,31 +217,65 @@ class WebSocketServer {
         
       case 'chat_message':
         // Handle chat message
+        console.log('Server received chat_message:', message.data);
         if (message.data && message.data.message && message.data.targetId) {
           // For group chat
           if (message.data.isGroupChat) {
-            this.broadcastToGroup(message.data.targetId, {
+            // Extract the group ID from the message - ensure it exists
+            const groupId = message.data.groupId || message.data.targetId;
+            
+            console.log(`Broadcasting group chat message to group ${groupId} from ${client.username || message.data.username}`);
+            
+            // Log active clients in this group
+            const groupClients = Array.from(this.clients).filter((c: WebSocketClient) => 
+              c.readyState === WebSocket.OPEN && c.groupId === groupId
+            );
+            console.log(`Group ${groupId} has ${groupClients.length} active clients:`, 
+              groupClients.map(c => ({ 
+                userId: c.userId, 
+                username: c.username,
+                groupId: c.groupId
+              }))
+            );
+            
+            // Use client username/userId or provided ones as fallback
+            const userId = client.userId || message.data.userId;
+            const username = client.username || message.data.username || 'Unknown User';
+            
+            console.log(`Using user info: userId=${userId}, username=${username}, groupId=${groupId}`);
+            
+            // Broadcast the message
+            this.broadcastToGroup(groupId, {
               type: 'chat_message',
               data: {
                 message: message.data.message,
-                username: client.username,
-                userId: client.userId,
-                groupId: message.data.targetId,
-                timestamp: new Date().toISOString()
+                username: username,
+                userId: userId,
+                groupId: groupId,
+                isGroupChat: true,
+                timestamp: message.data.timestamp || new Date().toISOString()
               }
             });
           } else {
             // For direct chat, send to specific user
+            console.log(`Sending direct chat message to user ${message.data.targetId} from ${client.username}`);
+            
+            // Use client username/userId or provided ones as fallback
+            const userId = client.userId || message.data.userId;
+            const username = client.username || message.data.username || 'Unknown User';
+            
             this.sendToUser(message.data.targetId, {
               type: 'chat_message',
               data: {
                 message: message.data.message,
-                username: client.username,
-                userId: client.userId,
+                username: username,
+                userId: userId,
                 timestamp: new Date().toISOString()
               }
             });
           }
+        } else {
+          console.error('Invalid chat message format:', message.data);
         }
         break;
         
@@ -270,12 +315,70 @@ class WebSocketServer {
    * Broadcast a message to all clients in a specific group
    */
   broadcastToGroup(groupId: number, message: any) {
+    if (!groupId) {
+      console.error('Cannot broadcast to invalid groupId:', groupId);
+      return;
+    }
+    
     const messageStr = JSON.stringify(message);
+    let sentCount = 0;
+    let skippedCount = 0;
+    const sentTo: Array<{userId?: number, username?: string}> = [];
+    const skipped: Array<{userId?: number, username?: string, reason: string}> = [];
+    
+    console.log(`Attempting to broadcast to group ${groupId}, message type: ${message.type}`);
+    
     this.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN && client.groupId === groupId) {
+      // Check if client is ready to receive messages
+      if (client.readyState !== WebSocket.OPEN) {
+        skippedCount++;
+        skipped.push({
+          userId: client.userId,
+          username: client.username,
+          reason: `Not ready: ${['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][client.readyState] || 'UNKNOWN'}`
+        });
+        return;
+      }
+      
+      // Check if client is in the target group
+      if (client.groupId !== groupId) {
+        skippedCount++;
+        skipped.push({
+          userId: client.userId,
+          username: client.username,
+          reason: `Wrong group: ${client.groupId} (target: ${groupId})`
+        });
+        return;
+      }
+      
+      // Client is ready and in the right group, send the message
+      try {
         client.send(messageStr);
+        sentCount++;
+        sentTo.push({
+          userId: client.userId,
+          username: client.username
+        });
+      } catch (error) {
+        console.error(`Error sending to client ${client.username || 'unknown'}:`, error);
+        skippedCount++;
+        skipped.push({
+          userId: client.userId,
+          username: client.username,
+          reason: 'Send error'
+        });
       }
     });
+    
+    console.log(`Broadcast to group ${groupId}: Sent to ${sentCount} clients, skipped ${skippedCount}`);
+    
+    if (sentCount > 0) {
+      console.log('Message sent to:', sentTo);
+    }
+    
+    if (skippedCount > 0 && skipped.length > 0) {
+      console.log('Skipped clients:', skipped);
+    }
   }
 
   /**
