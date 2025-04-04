@@ -66,12 +66,24 @@ app.post('/api/test/trigger-lunch-check', (req: Request, res: Response) => {
     });
   }
   
+  const now = new Date();
+  const timeInfo = {
+    iso: now.toISOString(),
+    local: now.toLocaleTimeString(),
+    hours: now.getHours(),
+    minutes: now.getMinutes(),
+    seconds: now.getSeconds(),
+    milliseconds: now.getMilliseconds()
+  };
+  
   try {
     wsServer.manualLunchTimeCheck()
       .then(() => {
         res.json({ 
           success: true, 
-          message: 'Lunch time check triggered successfully' 
+          message: 'Lunch time check triggered successfully',
+          time: timeInfo,
+          secondsPastMinute: now.getSeconds()
         });
       })
       .catch((error: any) => {
@@ -79,7 +91,8 @@ app.post('/api/test/trigger-lunch-check', (req: Request, res: Response) => {
         res.status(500).json({ 
           success: false, 
           message: 'Error triggering lunch time check', 
-          error: error.message 
+          error: error.message,
+          time: timeInfo
         });
       });
   } catch (error: any) {
@@ -87,7 +100,50 @@ app.post('/api/test/trigger-lunch-check', (req: Request, res: Response) => {
     res.status(500).json({ 
       success: false, 
       message: 'Error triggering lunch time check', 
-      error: error.message 
+      error: error.message,
+      time: timeInfo
+    });
+  }
+});
+
+// Endpoint to resynchronize the lunch time checker with the system clock
+app.post('/api/test/resync-lunch-scheduler', (req: Request, res: Response) => {
+  const wsServer = require('./config/websocket').getWebSocketServer();
+  
+  if (!wsServer) {
+    return res.status(500).json({ 
+      success: false, 
+      message: 'WebSocket server not initialized' 
+    });
+  }
+  
+  try {
+    // Stop the current interval
+    if (wsServer.lunchTimeChecker) {
+      clearInterval(wsServer.lunchTimeChecker);
+      wsServer.lunchTimeChecker = null;
+    }
+    
+    // Restart the scheduler with proper synchronization
+    wsServer.startLunchTimeChecker();
+    
+    const now = new Date();
+    res.json({
+      success: true,
+      message: 'Lunch time scheduler resynchronized with system clock',
+      currentTime: {
+        iso: now.toISOString(),
+        formatted: now.toLocaleTimeString(),
+        seconds: now.getSeconds(),
+        milliseconds: now.getMilliseconds()
+      }
+    });
+  } catch (error: any) {
+    console.error('Error resynchronizing lunch time scheduler:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resynchronizing lunch time scheduler',
+      error: error.message
     });
   }
 });

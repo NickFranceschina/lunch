@@ -12,7 +12,13 @@
     "start:server": "npm run dev --workspace=lunch-app/server",
     "start:browser-tools": "npx @agentdeskai/browser-tools-server@latest",
     "build": "npm run build --workspaces",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "test": "npm run test:client && npm run test:server",
+    "test:client": "npm test --workspace=lunch-app/client -- --watchAll=false",
+    "test:server": "npm test --workspace=lunch-app/server",
+    "test:coverage": "npm run test:client:coverage && npm run test:server:coverage",
+    "test:client:coverage": "npm run test:coverage --workspace=lunch-app/client",
+    "test:server:coverage": "npm test --workspace=lunch-app/server -- --coverage"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

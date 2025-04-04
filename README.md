@@ -39,6 +39,11 @@ The modernization is well underway with the following features implemented:
   - "Pop up" the application window for all users in the group
   - Display browser notifications when it's time for lunch
   - Allow groups to set specific times for their lunch break
+- Comprehensive testing suite with:
+  - Unit tests for frontend components
+  - Tests for API services with mock responses
+  - Backend controller and service tests
+  - Test coverage reporting
 
 ## Repository Structure
 
@@ -103,6 +108,35 @@ Individual services can be started separately using:
 - `npm run start:server` - Start only the server
 - `npm run start:browser-tools` - Start only the browser tools
 
+### Testing
+
+The application includes a comprehensive testing infrastructure:
+
+1. Running Tests:
+```bash
+# Run all tests (client and server)
+npm test
+
+# Run only client tests
+npm run test:client
+
+# Run only server tests
+npm run test:server
+
+# Generate test coverage reports
+npm run test:coverage
+```
+
+2. Test Coverage:
+   - Client-side tests include:
+     - Component rendering tests
+     - Service API call tests
+     - Context and hook tests
+   - Server-side tests include:
+     - Controller unit tests
+     - Service unit tests
+     - Authentication flow tests
+
 ### Feature Highlights:
 - Windows 98-style UI with authentic look and feel
 - Real-time group collaboration for restaurant selection
@@ -119,7 +153,7 @@ Individual services can be started separately using:
   - Cron-like scheduling system running on the server
 
 ### Next Steps:
-- Testing infrastructure
+- End-to-end testing
 - Deployment configuration
 
 ## Authentication

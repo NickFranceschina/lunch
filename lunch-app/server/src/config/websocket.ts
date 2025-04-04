@@ -53,7 +53,8 @@ class WebSocketServer {
    */
   private init() {
     this.wss.on('connection', (ws: WebSocketClient, req) => {
-      console.log('WebSocket client connected', {
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] WebSocket client connected`, {
         address: req.socket.remoteAddress,
         headers: req.headers
       });
@@ -63,13 +64,13 @@ class WebSocketServer {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const token = url.searchParams.get('token');
       
-      console.log('WebSocket connection URL:', url.toString());
-      console.log('Token present:', !!token);
+      console.log(`[${timestamp}] WebSocket connection URL:`, url.toString());
+      console.log(`[${timestamp}] Token present:`, !!token);
       
       if (token) {
         try {
           const decoded: any = verify(token, JWT_SECRET);
-          console.log('Token verified successfully for user:', decoded.username);
+          console.log(`[${timestamp}] Token verified successfully for user:`, decoded.username);
           
           // Fix: Correctly extract user data from decoded token
           ws.userId = decoded.id || decoded.userId;
@@ -79,7 +80,7 @@ class WebSocketServer {
           // Fix: Ensure currentGroupId is properly extracted and set
           ws.groupId = decoded.currentGroupId;
           
-          console.log('Client authenticated with:', {
+          console.log(`[${timestamp}] Client authenticated with:`, {
             userId: ws.userId,
             username: ws.username,
             isAdmin: ws.isAdmin,
@@ -94,14 +95,21 @@ class WebSocketServer {
                   user.isLoggedIn = true;
                   userRepository.save(user)
                     .then(() => {
-                      console.log(`Updated ${user.username}'s login status to true`);
+                      const timestamp = new Date().toISOString();
+                      console.log(`[${timestamp}] Updated ${user.username}'s login status to true`);
                       // Broadcast presence update to admins
                       this.broadcastUserPresenceUpdate(user.id, user.username, true);
                     })
-                    .catch(err => console.error('Error updating user login status:', err));
+                    .catch(err => {
+                      const timestamp = new Date().toISOString();
+                      console.error(`[${timestamp}] Error updating user login status:`, err)
+                    });
                 }
               })
-              .catch(err => console.error('Error finding user:', err));
+              .catch(err => {
+                const timestamp = new Date().toISOString();
+                console.error(`[${timestamp}] Error finding user:`, err)
+              });
           }
           
           // Send welcome message to authenticated client
@@ -114,7 +122,8 @@ class WebSocketServer {
             }
           }));
         } catch (err) {
-          console.error('Invalid token:', err);
+          const timestamp = new Date().toISOString();
+          console.error(`[${timestamp}] Invalid token:`, err);
           ws.send(JSON.stringify({
             type: 'error',
             data: { message: 'Authentication failed' }
@@ -123,7 +132,8 @@ class WebSocketServer {
           return;
         }
       } else {
-        console.log('Client without token');
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] Client without token`);
         ws.send(JSON.stringify({
           type: 'error',
           data: { message: 'Authentication token required' }
@@ -135,10 +145,13 @@ class WebSocketServer {
       // Handle messages from clients
       ws.on('message', (message: WebSocket.Data) => {
         try {
+          const timestamp = new Date().toISOString();
           const parsedMessage = JSON.parse(message.toString());
+          console.log(`[${timestamp}] Received message:`, parsedMessage);
           this.handleClientMessage(ws, parsedMessage);
         } catch (err) {
-          console.error('Error parsing message:', err);
+          const timestamp = new Date().toISOString();
+          console.error(`[${timestamp}] Error parsing message:`, err);
           ws.send(JSON.stringify({
             type: 'error',
             data: { message: 'Invalid message format' }
@@ -148,7 +161,8 @@ class WebSocketServer {
 
       // Handle client disconnection
       ws.on('close', () => {
-        console.log(`Client ${ws.username || 'unknown'} disconnected`);
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] Client ${ws.username || 'unknown'} disconnected`);
         
         // Update user login status in the database when disconnected
         if (ws.userId) {
@@ -158,14 +172,21 @@ class WebSocketServer {
                 user.isLoggedIn = false;
                 userRepository.save(user)
                   .then(() => {
-                    console.log(`Updated ${user.username}'s login status to false`);
+                    const timestamp = new Date().toISOString();
+                    console.log(`[${timestamp}] Updated ${user.username}'s login status to false`);
                     // Broadcast presence update to admins
                     this.broadcastUserPresenceUpdate(user.id, user.username, false);
                   })
-                  .catch(err => console.error('Error updating user login status on disconnect:', err));
+                  .catch(err => {
+                    const timestamp = new Date().toISOString();
+                    console.error(`[${timestamp}] Error updating user login status on disconnect:`, err)
+                  });
               }
             })
-            .catch(err => console.error('Error finding user on disconnect:', err));
+            .catch(err => {
+              const timestamp = new Date().toISOString();
+              console.error(`[${timestamp}] Error finding user on disconnect:`, err)
+            });
         }
         
         this.clients.delete(ws);
@@ -177,7 +198,8 @@ class WebSocketServer {
    * Handle messages received from clients
    */
   private handleClientMessage(client: WebSocketClient, message: any) {
-    console.log('Received message:', message);
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Processing message:`, message);
     
     switch (message.type) {
       case 'ping':
@@ -186,7 +208,7 @@ class WebSocketServer {
         
       case 'vote':
         // Handle voting and broadcast to relevant clients
-        console.log('Received vote message:', {
+        console.log(`[${timestamp}] Received vote message:`, {
           data: message.data,
           vote: message.data?.vote,
           clientId: client.userId,
@@ -228,7 +250,8 @@ class WebSocketServer {
               }
             })
             .catch(error => {
-              console.error('Error processing vote:', error);
+              const errorTimestamp = new Date().toISOString();
+              console.error(`[${errorTimestamp}] Error processing vote:`, error);
               // Send error message back to client
               client.send(JSON.stringify({
                 type: 'error',
@@ -238,7 +261,8 @@ class WebSocketServer {
               }));
             });
         } else {
-          console.error('Invalid vote message format or missing group ID:', message.data);
+          const errorTimestamp = new Date().toISOString();
+          console.error(`[${errorTimestamp}] Invalid vote message format or missing group ID:`, message.data);
           client.send(JSON.stringify({
             type: 'error',
             data: {
@@ -253,6 +277,8 @@ class WebSocketServer {
         if (client.groupId) {
           const groupId = client.groupId;
           
+          console.log(`[${timestamp}] User ${client.username} requesting new random restaurant for group ${groupId}`);
+          
           // Notify the group that someone is requesting a new random
           this.broadcastToGroup(groupId, {
             type: 'notification',
@@ -264,26 +290,29 @@ class WebSocketServer {
           
           // Process the random restaurant request
           this.processNewRandomRequest(groupId)
-            .catch(error => console.error('Error in processNewRandomRequest:', error));
+            .catch(error => {
+              const errorTimestamp = new Date().toISOString();
+              console.error(`[${errorTimestamp}] Error in processNewRandomRequest:`, error);
+            });
         }
         break;
         
       case 'chat_message':
         // Handle chat message
-        console.log('Server received chat_message:', message.data);
+        console.log(`[${timestamp}] Server received chat_message:`, message.data);
         if (message.data && message.data.message && message.data.targetId) {
           // For group chat
           if (message.data.isGroupChat) {
             // Extract the group ID from the message - ensure it exists
             const groupId = message.data.groupId || message.data.targetId;
             
-            console.log(`Broadcasting group chat message to group ${groupId} from ${client.username || message.data.username}`);
+            console.log(`[${timestamp}] Broadcasting group chat message to group ${groupId} from ${client.username || message.data.username}`);
             
             // Log active clients in this group
             const groupClients = Array.from(this.clients).filter((c: WebSocketClient) => 
               c.readyState === WebSocket.OPEN && c.groupId === groupId
             );
-            console.log(`Group ${groupId} has ${groupClients.length} active clients:`, 
+            console.log(`[${timestamp}] Group ${groupId} has ${groupClients.length} active clients:`, 
               groupClients.map(c => ({ 
                 userId: c.userId, 
                 username: c.username,
@@ -295,7 +324,7 @@ class WebSocketServer {
             const userId = client.userId || message.data.userId;
             const username = client.username || message.data.username || 'Unknown User';
             
-            console.log(`Using user info: userId=${userId}, username=${username}, groupId=${groupId}`);
+            console.log(`[${timestamp}] Using user info: userId=${userId}, username=${username}, groupId=${groupId}`);
             
             // Broadcast the message
             this.broadcastToGroup(groupId, {
@@ -306,12 +335,12 @@ class WebSocketServer {
                 userId: userId,
                 groupId: groupId,
                 isGroupChat: true,
-                timestamp: message.data.timestamp || new Date().toISOString()
+                timestamp: new Date().toISOString()
               }
             });
           } else {
             // For direct chat, send to specific user
-            console.log(`Sending direct chat message to user ${message.data.targetId} from ${client.username}`);
+            console.log(`[${timestamp}] Sending direct chat message to user ${message.data.targetId} from ${client.username}`);
             
             // Use client username/userId or provided ones as fallback
             const userId = client.userId || message.data.userId;
@@ -328,7 +357,8 @@ class WebSocketServer {
             });
           }
         } else {
-          console.error('Invalid chat message format:', message.data);
+          const errorTimestamp = new Date().toISOString();
+          console.error(`[${errorTimestamp}] Invalid chat message format:`, message.data);
         }
         break;
         
@@ -337,10 +367,12 @@ class WebSocketServer {
         if (message.data && message.data.message) {
           if (message.data.groupId) {
             // Send to specific group
+            console.log(`[${timestamp}] Broadcasting notification to group ${message.data.groupId}: "${message.data.message}"`);
             this.sendGroupNotification(message.data.groupId, message.data.message);
           } else {
             // Send to all users if client is admin
             if (client.isAdmin) {
+              console.log(`[${timestamp}] Broadcasting global notification: "${message.data.message}"`);
               this.sendGlobalNotification(message.data.message);
             }
           }
@@ -348,7 +380,7 @@ class WebSocketServer {
         break;
         
       default:
-        console.log(`Unhandled message type: ${message.type}`);
+        console.log(`[${timestamp}] Unhandled message type: ${message.type}`);
     }
   }
 
@@ -659,26 +691,50 @@ class WebSocketServer {
    * and notifies groups when it's time for lunch
    */
   startLunchTimeChecker() {
-    console.log('Starting lunch time checker...');
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Starting lunch time checker...`);
     
     // Run one check immediately after server starts
     setTimeout(() => {
-      console.log('Running initial lunch time check');
+      const checkTimestamp = new Date().toISOString();
+      console.log(`[${checkTimestamp}] Running initial lunch time check`);
       this.checkGroupLunchTimes().catch(err => 
-        console.error('Error in initial lunch time check:', err)
+        console.error(`[${checkTimestamp}] Error in initial lunch time check:`, err)
       );
     }, 5000);
     
-    // Check every minute
-    this.lunchTimeChecker = setInterval(async () => {
-      try {
-        await this.checkGroupLunchTimes();
-      } catch (error) {
-        console.error('Error in lunch time checker:', error);
-      }
-    }, 60000); // Check every minute
+    // Calculate time until the next minute starts (synchronize with clock)
+    const now = new Date();
+    const millisecondsUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    
+    console.log(`[${timestamp}] Will synchronize with clock in ${millisecondsUntilNextMinute}ms (at the start of the next minute)`);
+    console.log(`[${timestamp}] Current time: ${now.toISOString()} (${now.getSeconds()}.${now.getMilliseconds()} seconds into the minute)`);
+    console.log(`[${timestamp}] Target time: ${new Date(now.getTime() + millisecondsUntilNextMinute).toISOString()}`);
+    
+    // First timeout to synchronize with clock
+    setTimeout(() => {
+      const syncTimestamp = new Date().toISOString();
+      // Run a check right at the minute boundary
+      console.log(`[${syncTimestamp}] Synchronized with clock, running check at minute boundary`);
+      this.checkGroupLunchTimes().catch(err => 
+        console.error(`[${syncTimestamp}] Error in synchronized lunch time check:`, err)
+      );
+      
+      // Now set interval exactly on minute boundaries
+      this.lunchTimeChecker = setInterval(async () => {
+        const intervalTimestamp = new Date().toISOString();
+        try {
+          console.log(`[${intervalTimestamp}] Running scheduled lunch time check`);
+          await this.checkGroupLunchTimes();
+        } catch (error) {
+          console.error(`[${intervalTimestamp}] Error in lunch time checker:`, error);
+        }
+      }, 60000); // Check exactly every minute
+      
+      console.log(`[${syncTimestamp}] Lunch time checker synchronized with clock - will check exactly at the start of each minute`);
+    }, millisecondsUntilNextMinute);
 
-    console.log('Lunch time checker started - will check every minute');
+    console.log(`[${timestamp}] Lunch time checker started - will synchronize with system clock`);
   }
 
   /**
@@ -686,9 +742,10 @@ class WebSocketServer {
    */
   stopLunchTimeChecker() {
     if (this.lunchTimeChecker) {
+      const timestamp = new Date().toISOString();
       clearInterval(this.lunchTimeChecker);
       this.lunchTimeChecker = null;
-      console.log('Lunch time checker stopped');
+      console.log(`[${timestamp}] Lunch time checker stopped`);
     }
   }
   
@@ -697,12 +754,15 @@ class WebSocketServer {
    * This can be exposed through an admin API endpoint
    */
   async manualLunchTimeCheck(): Promise<void> {
-    console.log('Manual lunch time check triggered');
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Manual lunch time check triggered`);
     try {
       await this.checkGroupLunchTimes();
-      console.log('Manual lunch time check completed');
+      const completedTimestamp = new Date().toISOString();
+      console.log(`[${completedTimestamp}] Manual lunch time check completed`);
     } catch (error) {
-      console.error('Error in manual lunch time check:', error);
+      const errorTimestamp = new Date().toISOString();
+      console.error(`[${errorTimestamp}] Error in manual lunch time check:`, error);
       throw error;
     }
   }
@@ -713,8 +773,10 @@ class WebSocketServer {
    */
   async checkGroupLunchTimes() {
     const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
-    console.log(`Checking for lunch times at ${currentTime}`);
+    const fullTimeString = now.toTimeString();
+    const isoTimestamp = now.toISOString();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    console.log(`[${isoTimestamp}] Checking for lunch times at ${currentTime} (${now.getSeconds()} seconds past the minute)`);
 
     try {
       // Find all groups with notification time matching current time (just compare hours and minutes)
@@ -725,7 +787,7 @@ class WebSocketServer {
         }
       });
 
-      console.log(`Found ${groups.length} groups with notification times set`);
+      console.log(`[${isoTimestamp}] Found ${groups.length} groups with notification times set`);
       
       for (const group of groups) {
         if (!group.notificationTime) continue;
@@ -751,27 +813,27 @@ class WebSocketServer {
           }
           // If it's stored in another format, try to convert it to a date
           else {
-            console.log(`Group ${group.id} notification time format:`, typeof group.notificationTime, group.notificationTime);
+            console.log(`[${isoTimestamp}] Group ${group.id} notification time format:`, typeof group.notificationTime, group.notificationTime);
             const dateObj = new Date(group.notificationTime as any);
             if (!isNaN(dateObj.getTime())) {
               groupHours = dateObj.getHours();
               groupMinutes = dateObj.getMinutes();
             } else {
-              console.error(`Cannot parse notification time for group ${group.name}:`, group.notificationTime);
+              console.error(`[${isoTimestamp}] Cannot parse notification time for group ${group.name}:`, group.notificationTime);
               continue;
             }
           }
           
           // Skip if we couldn't determine hours or minutes
           if (groupHours === undefined || groupMinutes === undefined) {
-            console.error(`Could not extract hours/minutes for group ${group.name}:`, group.notificationTime);
+            console.error(`[${isoTimestamp}] Could not extract hours/minutes for group ${group.name}:`, group.notificationTime);
             continue;
           }
           
           groupTime = `${groupHours.toString().padStart(2, '0')}:${groupMinutes.toString().padStart(2, '0')}`;
         } catch (error) {
-          console.error(`Error parsing notification time for group ${group.name}:`, error);
-          console.log('Notification time value:', group.notificationTime);
+          console.error(`[${isoTimestamp}] Error parsing notification time for group ${group.name}:`, error);
+          console.log(`[${isoTimestamp}] Notification time value:`, group.notificationTime);
           continue;
         }
         
@@ -779,10 +841,10 @@ class WebSocketServer {
         const currentMinutes = now.getMinutes();
         const currentTimeStr = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
         
-        console.log(`Group: ${group.name}, Group time: ${groupTime}, Current time: ${currentTimeStr}`);
+        console.log(`[${isoTimestamp}] Group: ${group.name}, Group time: ${groupTime}, Current time: ${currentTimeStr} (${now.getSeconds()} seconds past the minute)`);
         
         if (groupHours === currentHours && groupMinutes === currentMinutes) {
-          console.log(`It's lunch time for group: ${group.name} at ${groupTime}!`);
+          console.log(`[${isoTimestamp}] It's lunch time for group: ${group.name} at ${groupTime}! (Triggering at ${currentTime})`);
           
           // Select a random restaurant for this group
           await this.processNewRandomRequest(group.id);
@@ -791,7 +853,7 @@ class WebSocketServer {
           const updatedGroup = await this.getGroupInfo(group.id);
           
           if (updatedGroup && updatedGroup.currentRestaurant) {
-            console.log(`Selected restaurant for group ${group.name}: ${updatedGroup.currentRestaurant}`);
+            console.log(`[${isoTimestamp}] Selected restaurant for group ${group.name}: ${updatedGroup.currentRestaurant}`);
             
             // Send notification to all users in the group
             this.sendGroupNotification(
@@ -806,18 +868,19 @@ class WebSocketServer {
                 groupId: group.id,
                 groupName: group.name,
                 restaurant: updatedGroup.currentRestaurant,
-                message: `It's lunch time for ${group.name}!`
+                message: `It's lunch time for ${group.name}!`,
+                timestamp: isoTimestamp
               }
             });
             
-            console.log(`Sent lunch time notification to ${group.users?.length || 0} users in group ${group.name}`);
+            console.log(`[${isoTimestamp}] Sent lunch time notification to ${group.users?.length || 0} users in group ${group.name}`);
           } else {
-            console.error(`Failed to get restaurant for group: ${group.name}`);
+            console.error(`[${isoTimestamp}] Failed to get restaurant for group: ${group.name}`);
           }
         }
       }
     } catch (error) {
-      console.error('Error checking group lunch times:', error);
+      console.error(`[${isoTimestamp}] Error checking group lunch times:`, error);
     }
   }
 }
