@@ -317,6 +317,18 @@ const MainWindow: React.FC = () => {
             }
           });
           
+          // Add listener for user presence updates to prevent console warnings
+          const userPresenceUnsubscribe = websocketService.addMessageListener('user_presence_update', (data: any) => {
+            // Just log it - actual UI updates happen in UserPanel when it's open
+            console.log('MainWindow - Received user presence update for:', data.username);
+          });
+          
+          // Add listener for connection established messages
+          const connectionEstablishedUnsubscribe = websocketService.addMessageListener('connection_established', (data: any) => {
+            console.log('MainWindow - Connection established with server:', data);
+            showStatusMessage(`Connected as ${data.username}`);
+          });
+          
           // Add listener for error messages from the server
           const errorUnsubscribe = websocketService.addMessageListener('error', (data: any) => {
             console.error('MainWindow - Received error from server:', data);
@@ -332,11 +344,13 @@ const MainWindow: React.FC = () => {
           
           // Create cleanup function
           cleanupFunction = () => {
-            console.log("MainWindow - Cleaning up event listeners");
+            console.log('Cleaning up WebSocket listeners');
             selectionUnsubscribe();
             voteUnsubscribe();
             notificationUnsubscribe();
             chatUnsubscribe();
+            userPresenceUnsubscribe();
+            connectionEstablishedUnsubscribe();
             errorUnsubscribe();
             clearInterval(pingInterval);
             
