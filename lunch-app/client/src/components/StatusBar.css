@@ -2,34 +2,19 @@
   width: 100%;
   height: 22px;
   background-color: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #5a5a5a;
-  border-bottom: 1px solid #5a5a5a;
+  border: 1px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  padding: 3px 5px;
   text-align: left;
   color: #000;
   font-family: "MS Sans Serif", Arial, sans-serif;
   font-size: 11px;
   display: flex;
   align-items: center;
-  animation: fadeIn 0.3s ease-in-out;
-  box-sizing: border-box;
-  position: relative;
-}
-
-.status-bar::before {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  bottom: 2px;
-  width: 2px;
-  background-color: #c0c0c0;
-  border-right: 1px solid #808080;
 }
 
 .status-message {
-  padding: 0 6px 0 10px;
+  padding-left: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

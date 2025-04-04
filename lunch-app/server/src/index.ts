@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import groupRoutes from './routes/group.routes';
 import restaurantRoutes from './routes/restaurant.routes';
+import chatRoutes from './routes/chat.routes';
 
 const app: Express = express();
 const port = process.env.PORT || 3001;
@@ -44,6 +45,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Root route
 app.get('/', (req: Request, res: Response) => {

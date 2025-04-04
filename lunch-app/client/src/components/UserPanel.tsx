@@ -19,6 +19,7 @@ interface UserPanelProps {
   token: string;
   isAdmin: boolean;
   currentUserId: number;
+  onStartChat?: (userId: number) => void;
 }
 
 const UserPanel: React.FC<UserPanelProps> = ({ 
@@ -26,7 +27,8 @@ const UserPanel: React.FC<UserPanelProps> = ({
   onClose, 
   token,
   isAdmin,
-  currentUserId
+  currentUserId,
+  onStartChat
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -199,177 +201,201 @@ const UserPanel: React.FC<UserPanelProps> = ({
     
     // If admin, also set up edit form
     if (isAdmin) {
-      handleEdit(user);
+      setFormData({
+        username: user.username,
+        password: '', // Password field is cleared for security
+        isAdmin: user.isAdmin
+      });
+      setEditingId(user.id);
     }
   };
-
-  // Get selected user details
+  
+  // Get the selected user
   const getSelectedUser = () => {
-    return users.find(u => u.id === selectedUserId) || (users.length > 0 ? users[0] : null);
+    return users.find(user => user.id === selectedUserId);
+  };
+  
+  // Handle starting a chat with a user
+  const handleChatWithUser = () => {
+    if (selectedUserId && onStartChat) {
+      onStartChat(selectedUserId);
+    }
   };
 
   if (!isVisible) return null;
 
-  const selectedUser = getSelectedUser();
-
   return (
-    <div className="user-panel-overlay">
-      <div className="user-panel">
-        <h2>User Management</h2>
-        
-        {error && <div className="error-message">{error}</div>}
-        
-        <div className="filter-controls">
-          <label>
-            <input
-              type="radio"
-              name="userFilter"
-              checked={showOnlyLoggedIn}
-              onChange={() => setShowOnlyLoggedIn(true)}
-            />
-            Currently Logged In
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="userFilter"
-              checked={!showOnlyLoggedIn}
-              onChange={() => setShowOnlyLoggedIn(false)}
-            />
-            All Users
-          </label>
+    <div className="user-panel window">
+      <div className="title-bar">
+        <div className="title-bar-text">User Management</div>
+        <div className="title-bar-controls">
+          <button aria-label="Close" onClick={onClose}></button>
         </div>
-
-        <div className="panel-layout">
-          <div className="user-list-container">
-            <h3>Users</h3>
-            {loading && users.length === 0 ? (
-              <p>Loading users...</p>
-            ) : users.length === 0 ? (
-              <p>No users found.</p>
-            ) : (
+      </div>
+      <div className="window-body">
+        <div className="panel-content">
+          {error && <div className="error-message">{error}</div>}
+          
+          <div className="users-section">
+            <div className="filter-section">
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={showOnlyLoggedIn} 
+                  onChange={() => setShowOnlyLoggedIn(!showOnlyLoggedIn)} 
+                />
+                Show only logged in users
+              </label>
+              <button 
+                onClick={fetchUsers} 
+                disabled={loading}
+                className="refresh-button"
+              >
+                Refresh
+              </button>
+            </div>
+            
+            <div className="user-list-container">
               <div className="user-list">
-                {users.map(user => (
-                  <div 
-                    key={user.id} 
-                    className={`user-item ${user.id === currentUserId ? 'current-user' : ''} ${user.id === selectedUserId ? 'selected-user' : ''}`}
-                    onClick={() => handleUserSelect(user)}
-                  >
-                    <span>{user.username}</span>
-                    {user.isLoggedIn && <span className="logged-in-indicator">•</span>}
-                  </div>
-                ))}
+                {loading ? (
+                  <div className="loading">Loading users...</div>
+                ) : users.length === 0 ? (
+                  <div className="no-users">No users found</div>
+                ) : (
+                  users.map(user => (
+                    <div 
+                      key={user.id}
+                      className={`user-item ${selectedUserId === user.id ? 'selected' : ''} ${user.isLoggedIn ? 'logged-in' : 'logged-out'}`}
+                      onClick={() => handleUserSelect(user)}
+                    >
+                      <div className="user-item-name">
+                        <span className="status-dot"></span>
+                        <span>{user.username}</span>
+                        {user.isAdmin && <span className="admin-badge">Admin</span>}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-            )}
+            </div>
+            
+            <div className="user-actions">
+              {selectedUserId && selectedUserId !== currentUserId && onStartChat && (
+                <button 
+                  onClick={handleChatWithUser}
+                  className="chat-button"
+                  disabled={!getSelectedUser()?.isLoggedIn}
+                >
+                  Chat with User
+                </button>
+              )}
+            </div>
           </div>
-
-          <div className="user-details">
-            <h3>User Details</h3>
-            {selectedUser && (
-              <div className="selected-user-info">
-                <div className="info-row">
-                  <span>Group:</span>
-                  <span>
-                    {
-                      (() => {
-                        const groupId = selectedUser.currentGroupId;
-                        if (!groupId) return 'None';
-                        const group = selectedUser.groups?.find(g => g.id === groupId);
-                        return group ? group.name : groupId;
-                      })()
-                    }
+          
+          {isAdmin && (
+            <div className="user-form-section">
+              <h3>{editingId ? 'Edit User' : 'Create New User'}</h3>
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label htmlFor="username">Username:</label>
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="password">Password:</label>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    required={!editingId} // Only required for new users
+                    placeholder={editingId ? "(leave blank to keep current)" : ""}
+                  />
+                </div>
+                
+                <div className="form-group checkbox">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="isAdmin"
+                      checked={formData.isAdmin}
+                      onChange={handleInputChange}
+                    />
+                    Admin User
+                  </label>
+                </div>
+                
+                <div className="form-buttons">
+                  <button type="submit" disabled={loading}>
+                    {editingId ? 'Update User' : 'Create User'}
+                  </button>
+                  
+                  {editingId && (
+                    <>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setFormData({ username: '', password: '', isAdmin: false });
+                          setEditingId(null);
+                        }}
+                        disabled={loading}
+                      >
+                        Cancel
+                      </button>
+                      
+                      <button 
+                        type="button"
+                        onClick={() => handleDelete(editingId)}
+                        className="delete-button"
+                        disabled={loading || editingId === currentUserId}
+                      >
+                        Delete User
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+          
+          {getSelectedUser() && (
+            <div className="user-details">
+              <h3>User Details</h3>
+              <div className="details-row">
+                <span className="label">Username:</span>
+                <span className="value">{getSelectedUser()?.username}</span>
+              </div>
+              <div className="details-row">
+                <span className="label">Status:</span>
+                <span className="value">
+                  {getSelectedUser()?.isLoggedIn ? 'Online' : 'Offline'}
+                </span>
+              </div>
+              <div className="details-row">
+                <span className="label">Role:</span>
+                <span className="value">
+                  {getSelectedUser()?.isAdmin ? 'Administrator' : 'Regular User'}
+                </span>
+              </div>
+              {getSelectedUser()?.currentGroupId && (
+                <div className="details-row">
+                  <span className="label">Current Group:</span>
+                  <span className="value">
+                    {getSelectedUser()?.groups?.find(g => g.id === getSelectedUser()?.currentGroupId)?.name || 'Unknown'}
                   </span>
                 </div>
-                <div className="info-row">
-                  <span>IP Address:</span>
-                  <span>{selectedUser.ipAddress || 'N/A'}</span>
-                </div>
-                <div className="info-row">
-                  <span>Port:</span>
-                  <span>{selectedUser.port || 'N/A'}</span>
-                </div>
-              </div>
-            )}
-
-            {isAdmin && (
-              <>
-                <h3>{editingId ? 'Edit User' : 'Add New User'}</h3>
-                <form onSubmit={handleSubmit}>
-                  <div className="form-group">
-                    <label htmlFor="username">Username:</label>
-                    <input
-                      type="text"
-                      id="username"
-                      name="username"
-                      value={formData.username}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="password">
-                      Password {editingId && '(leave blank to keep current)'}:
-                    </label>
-                    <input
-                      type="password"
-                      id="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      required={!editingId}
-                    />
-                  </div>
-                  
-                  <div className="form-group checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        name="isAdmin"
-                        checked={formData.isAdmin}
-                        onChange={handleInputChange}
-                      />
-                      Administrator
-                    </label>
-                  </div>
-                  
-                  <div className="button-group">
-                    <button type="submit" disabled={loading}>
-                      {editingId ? 'Update' : 'Add'} User
-                    </button>
-                    {editingId && (
-                      <>
-                        <button 
-                          type="button" 
-                          onClick={() => handleDelete(editingId)}
-                          className="delete-button"
-                          disabled={loading || editingId === currentUserId}
-                        >
-                          Delete
-                        </button>
-                        <button 
-                          type="button" 
-                          onClick={() => {
-                            setFormData({
-                              username: '',
-                              password: '',
-                              isAdmin: false
-                            });
-                            setEditingId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
-        
-        <button className="close-button" onClick={onClose}>Close</button>
       </div>
     </div>
   );

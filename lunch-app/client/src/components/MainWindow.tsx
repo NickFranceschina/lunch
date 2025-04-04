@@ -7,8 +7,12 @@ import RestaurantPanel from './RestaurantPanel';
 import UserPanel from './UserPanel';
 import GroupPanel from './GroupPanel';
 import StatusBar from './StatusBar';
-import { authService, restaurantService } from '../services/api';
+import UserChat from './UserChat';
+import GroupChat from './GroupChat';
+import { authService, restaurantService, userService, groupService } from '../services/api';
 import { websocketService } from '../services/websocket.service';
+import { User } from '../types/User';
+import { Group } from '../types/Group';
 import './MainWindow.css';
 
 const MainWindow: React.FC = () => {
@@ -27,6 +31,12 @@ const MainWindow: React.FC = () => {
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [showStatus, setShowStatus] = useState<boolean>(false);
+  
+  // Chat state
+  const [showUserChat, setShowUserChat] = useState<boolean>(false);
+  const [showGroupChat, setShowGroupChat] = useState<boolean>(false);
+  const [chatWithUser, setChatWithUser] = useState<User | null>(null);
+  const [groupChatData, setGroupChatData] = useState<Group | null>(null);
 
   // Show status message with auto-hide after delay
   const showStatusMessage = (message: string, duration: number = 3000) => {
@@ -42,55 +52,59 @@ const MainWindow: React.FC = () => {
     return () => clearTimeout(timer);
   };
 
-  // Set up WebSocket event listeners
-  const setupWebSocketListeners = useCallback(() => {
-    // Listen for restaurant selection updates
-    const selectionUnsubscribe = websocketService.addMessageListener('restaurant_selection', (data: any) => {
-      setRestaurantName(data.restaurantName);
-      setConfirmed(data.confirmed);
-    });
-
-    // Listen for vote updates
-    const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
-      console.log('Vote update:', data);
-      // You could update a UI element showing who voted
-    });
-
-    // Listen for notifications
-    const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
-      showStatusMessage(data.message, 5000);
-    });
-
-    // Return cleanup function
-    return () => {
-      selectionUnsubscribe();
-      voteUnsubscribe();
-      notificationUnsubscribe();
-    };
-  }, []);
-
   // Connect to WebSocket when logged in
   useEffect(() => {
+    let cleanupFunction: (() => void) | undefined;
+    let pingInterval: NodeJS.Timeout | undefined;
+    
     if (isLoggedIn && token) {
       console.log("Attempting WebSocket connection with token:", token.substring(0, 10) + "...");
       
+      // Connect to WebSocket
       websocketService.connect(token)
         .then(() => {
           setWsConnected(true);
           console.log('WebSocket connected successfully');
           showStatusMessage('Connected to server');
           
-          // Send periodic pings to keep connection alive
-          const pingInterval = setInterval(() => {
-            if (isLoggedIn) {
-              websocketService.ping();
-            } else {
-              clearInterval(pingInterval);
-            }
-          }, 30000); // Every 30 seconds
+          // Add event listeners after successful connection
+          const selectionUnsubscribe = websocketService.addMessageListener('restaurant_selection', (data: any) => {
+            setRestaurantName(data.restaurantName);
+            setConfirmed(data.confirmed);
+          });
           
-          return () => {
+          const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
+            console.log('Vote update:', data);
+          });
+          
+          const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
+            showStatusMessage(data.message, 5000);
+          });
+          
+          const chatUnsubscribe = websocketService.addMessageListener('chat_message', (data: any) => {
+            if (data.groupId) {
+              showStatusMessage(`New group chat message from ${data.senderName}`, 3000);
+            } else {
+              showStatusMessage(`New chat message from ${data.senderName}`, 3000);
+            }
+          });
+          
+          // Setup ping interval
+          pingInterval = setInterval(() => {
+            if (websocketService.isConnected()) {
+              websocketService.ping();
+            }
+          }, 30000);
+          
+          // Create cleanup function
+          cleanupFunction = () => {
+            selectionUnsubscribe();
+            voteUnsubscribe();
+            notificationUnsubscribe();
+            chatUnsubscribe();
             clearInterval(pingInterval);
+            websocketService.disconnect();
+            setWsConnected(false);
           };
         })
         .catch(error => {
@@ -98,21 +112,16 @@ const MainWindow: React.FC = () => {
           setWsConnected(false);
           showStatusMessage('Failed to connect to server', 5000);
         });
-      
-      // Set up listeners
-      const unsubscribe = setupWebSocketListeners();
-      
-      // Clean up on unmount or logout
-      return () => {
-        console.log("Cleaning up WebSocket connection");
-        unsubscribe();
-        if (wsConnected) {
-          websocketService.disconnect();
-          setWsConnected(false);
-        }
-      };
     }
-  }, [isLoggedIn, token, setupWebSocketListeners, wsConnected]);
+    
+    // Return cleanup function
+    return () => {
+      if (cleanupFunction) {
+        console.log("Cleaning up WebSocket connection");
+        cleanupFunction();
+      }
+    };
+  }, [isLoggedIn, token]);
 
   // Handle login
   const handleLoginClick = () => {
@@ -251,51 +260,105 @@ const MainWindow: React.FC = () => {
   const handleGroupPanelToggle = () => {
     setShowGroupPanel(!showGroupPanel);
   };
+  
+  // Chat functions
+  const handleStartUserChat = async (userId: number) => {
+    try {
+      const response = await userService.getUserById(userId, token);
+      setChatWithUser(response.data);
+      setShowUserChat(true);
+      setShowUserPanel(false); // Optionally close the user panel
+    } catch (error) {
+      console.error('Failed to get user info:', error);
+      showStatusMessage('Failed to start chat', 3000);
+    }
+  };
+  
+  const handleCloseUserChat = () => {
+    setShowUserChat(false);
+    setChatWithUser(null);
+  };
+  
+  const handleStartGroupChat = async () => {
+    if (!currentGroup) {
+      showStatusMessage('You need to be in a group to start a group chat', 3000);
+      return;
+    }
+    
+    try {
+      const response = await groupService.getGroupById(currentGroup, token);
+      setGroupChatData(response.data);
+      setShowGroupChat(true);
+    } catch (error) {
+      console.error('Failed to get group info:', error);
+      showStatusMessage('Failed to start group chat', 3000);
+    }
+  };
+  
+  const handleCloseGroupChat = () => {
+    setShowGroupChat(false);
+    setGroupChatData(null);
+  };
 
   return (
-    <div className="win98-container">
-      <div className="win98-titlebar">
-        <div className="titlebar-text">Lunch App</div>
-      </div>
-      <div className="main-window">
-        <div className="top-bar">
-          <div className="menu-bar">
-            <div className="menu-item">
-              <span>Start</span>
-              <div className="dropdown-content">
-                {!isLoggedIn ? (
-                  <div className="dropdown-item" onClick={handleLoginClick}>Login</div>
-                ) : (
-                  <div className="dropdown-item" onClick={handleLogout}>Logout</div>
-                )}
-              </div>
-            </div>
-            {isLoggedIn && isAdmin && (
-              <div className="menu-item">
-                <span>Administer</span>
-                <div className="dropdown-content">
-                  <div className="dropdown-item" onClick={handleUserPanelToggle}>User Info</div>
-                  <div className="dropdown-item" onClick={handleGroupPanelToggle}>Group Info</div>
-                  <div className="dropdown-item" onClick={handleRestaurantPanelToggle}>Restaurants</div>
-                </div>
-              </div>
-            )}
-            <div className="menu-item">
-              <span>About</span>
-            </div>
-          </div>
-          <LEDIndicator confirmed={confirmed} />
-          {wsConnected && <div className="ws-indicator">🔄</div>}
+    <div className="main-window">
+      <div className="title-bar">
+        <div className="title-bar-text">LUNCH Application</div>
+        <div className="title-bar-controls">
+          <button aria-label="Minimize"></button>
+          <button aria-label="Maximize"></button>
+          <button aria-label="Close"></button>
         </div>
-
-        <RestaurantDisplay restaurantName={restaurantName} />
+      </div>
+      
+      <div className="window-body">
+        <div className="menu-bar">
+          <div className="menu-item">
+            <button 
+              onClick={isLoggedIn ? handleLogout : handleLoginClick}
+              className="menu-button"
+            >
+              {isLoggedIn ? 'Logout' : 'Login'}
+            </button>
+          </div>
+          
+          {isLoggedIn && (
+            <>
+              <div className="menu-item">
+                <button 
+                  onClick={handleStartGroupChat}
+                  className="menu-button"
+                >
+                  Group Chat
+                </button>
+              </div>
+              
+              {isAdmin && (
+                <div className="menu-item dropdown">
+                  <button className="menu-button">Administer</button>
+                  <div className="dropdown-content">
+                    <button onClick={handleRestaurantPanelToggle}>Restaurants</button>
+                    <button onClick={handleUserPanelToggle}>Users</button>
+                    <button onClick={handleGroupPanelToggle}>Groups</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
         
-        <VotingControls
-          enabled={isLoggedIn}
-          onVoteYes={handleVoteYes}
-          onVoteNo={handleVoteNo}
-          onNewRandom={handleNewRandom}
-        />
+        <div className="content">
+          <div className="application-content">
+            <LEDIndicator confirmed={confirmed} />
+            <RestaurantDisplay restaurantName={restaurantName} />
+            <VotingControls 
+              onVoteYes={handleVoteYes} 
+              onVoteNo={handleVoteNo} 
+              onNewRandom={handleNewRandom}
+              enabled={isLoggedIn && wsConnected}
+            />
+          </div>
+        </div>
       </div>
       
       <StatusBar 
@@ -303,35 +366,58 @@ const MainWindow: React.FC = () => {
         isVisible={showStatus}
       />
       
-      <LoginDialog 
-        isVisible={showLoginDialog} 
-        onLogin={handleLoginSubmit}
-        onCancel={handleLoginCancel}
-      />
+      {showLoginDialog && (
+        <LoginDialog 
+          onLogin={handleLoginSubmit} 
+          onCancel={handleLoginCancel} 
+          isVisible={showLoginDialog}
+        />
+      )}
       
-      <RestaurantPanel
-        isVisible={showRestaurantPanel}
-        onClose={handleRestaurantPanelToggle}
-        token={token}
-        groupId={currentGroup || undefined}
-      />
-
-      <UserPanel
-        isVisible={showUserPanel}
-        onClose={handleUserPanelToggle}
-        token={token}
-        isAdmin={isAdmin}
-        currentUserId={currentUserId}
-      />
-
-      <GroupPanel
-        isVisible={showGroupPanel}
-        onClose={handleGroupPanelToggle}
-        token={token}
-        currentUserId={currentUserId}
-        currentGroupId={currentGroup || undefined}
-        isAdmin={isAdmin}
-      />
+      {showRestaurantPanel && isLoggedIn && (
+        <RestaurantPanel 
+          token={token} 
+          onClose={() => setShowRestaurantPanel(false)} 
+          isVisible={showRestaurantPanel}
+          groupId={currentGroup || undefined}
+        />
+      )}
+      
+      {showUserPanel && isLoggedIn && (
+        <UserPanel 
+          token={token} 
+          onClose={() => setShowUserPanel(false)}
+          onStartChat={handleStartUserChat}
+          isVisible={showUserPanel}
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
+        />
+      )}
+      
+      {showGroupPanel && isLoggedIn && (
+        <GroupPanel 
+          token={token} 
+          onClose={() => setShowGroupPanel(false)} 
+          isVisible={showGroupPanel}
+          currentUserId={currentUserId}
+          currentGroupId={currentGroup || undefined}
+          isAdmin={isAdmin}
+        />
+      )}
+      
+      {showUserChat && chatWithUser && (
+        <UserChat 
+          recipient={chatWithUser}
+          onClose={handleCloseUserChat}
+        />
+      )}
+      
+      {showGroupChat && groupChatData && (
+        <GroupChat
+          group={groupChatData}
+          onClose={handleCloseGroupChat}
+        />
+      )}
     </div>
   );
 };

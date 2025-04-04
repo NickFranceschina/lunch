@@ -37,9 +37,6 @@ class WebSocketService {
         return `token=${token.substring(0, 10)}...${token.substring(token.length - 5)}`;
       });
       console.log('Connecting to WebSocket server at:', maskedUrl);
-      console.log('Using protocol:', protocol);
-      console.log('Using host:', host);
-      console.log('Using port:', port);
       
       try {
         this.socket = new WebSocket(url);
@@ -95,19 +92,19 @@ class WebSocketService {
           }
         };
       } catch (error) {
+        console.error('Error creating WebSocket:', error);
         this.isConnecting = false;
-        console.error('Error creating WebSocket connection:', error);
         reject(error);
       }
     });
   }
 
   /**
-   * Close the WebSocket connection
+   * Disconnect from the WebSocket server
    */
   disconnect(): void {
     if (this.socket) {
-      this.socket.close(1000, 'User logout');
+      this.socket.close(1000, 'Disconnecting');
       this.socket = null;
     }
     
@@ -118,28 +115,6 @@ class WebSocketService {
     
     // Clear all message listeners
     this.messageListeners = {};
-  }
-
-  /**
-   * Schedule an attempt to reconnect to the WebSocket server
-   */
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer) {
-      return;
-    }
-    
-    console.log(`Scheduling reconnect in ${this.reconnectInterval}ms`);
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      const token = localStorage.getItem('token');
-      if (token) {
-        console.log('Attempting to reconnect...');
-        this.connect(token).catch(error => {
-          console.error('Reconnect failed:', error);
-          this.scheduleReconnect();
-        });
-      }
-    }, this.reconnectInterval);
   }
 
   /**
@@ -158,30 +133,7 @@ class WebSocketService {
   }
 
   /**
-   * Handle incoming WebSocket messages
-   * @param message The received message
-   */
-  private handleMessage(message: any): void {
-    if (!message || !message.type) {
-      console.error('Invalid message format:', message);
-      return;
-    }
-    
-    console.log('Received message:', message);
-    
-    // Notify all listeners for this message type
-    const listeners = this.messageListeners[message.type] || [];
-    listeners.forEach(listener => {
-      try {
-        listener(message.data);
-      } catch (error) {
-        console.error(`Error in message listener for type ${message.type}:`, error);
-      }
-    });
-  }
-
-  /**
-   * Add a listener for a specific message type
+   * Add event listener for a specific message type
    * @param type Message type to listen for
    * @param callback Function to call when message is received
    * @returns Function to remove the listener
@@ -193,13 +145,73 @@ class WebSocketService {
     
     this.messageListeners[type].push(callback);
     
+    // Return a function to remove this listener
     return () => {
-      this.messageListeners[type] = this.messageListeners[type]?.filter(cb => cb !== callback) || [];
+      const index = this.messageListeners[type].indexOf(callback);
+      if (index !== -1) {
+        this.messageListeners[type].splice(index, 1);
+      }
     };
   }
 
   /**
-   * Send a ping message to keep the connection alive
+   * Handle incoming WebSocket messages
+   * @param message Parsed message from the server
+   */
+  private handleMessage(message: any): void {
+    const { type, data } = message;
+    
+    if (!type) {
+      console.warn('Received message without type:', message);
+      return;
+    }
+    
+    // Notify all listeners for this message type
+    const listeners = this.messageListeners[type] || [];
+    listeners.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error(`Error in message listener for type "${type}":`, error);
+      }
+    });
+    
+    // Also notify "all" listeners
+    const allListeners = this.messageListeners['all'] || [];
+    allListeners.forEach(callback => {
+      try {
+        callback(message);
+      } catch (error) {
+        console.error('Error in "all" message listener:', error);
+      }
+    });
+  }
+
+  /**
+   * Check if WebSocket is currently connected
+   */
+  isConnected(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Schedule a reconnection attempt
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    
+    this.reconnectTimer = setTimeout(() => {
+      console.log('Attempting to reconnect to WebSocket server...');
+      // Need to get a fresh token here somehow
+      // For now, just emit an event that the app can listen to
+      window.dispatchEvent(new CustomEvent('websocket:reconnect_needed'));
+    }, this.reconnectInterval);
+  }
+
+  /**
+   * Send a ping to keep the connection alive
    */
   ping(): void {
     this.sendMessage('ping', { time: new Date().toISOString() });
@@ -249,5 +261,5 @@ class WebSocketService {
   }
 }
 
-// Export singleton instance
+// Create a singleton instance
 export const websocketService = new WebSocketService(); 

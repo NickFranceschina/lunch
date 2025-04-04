@@ -289,4 +289,88 @@ export const groupService = {
     
     return response.json();
   }
+};
+
+// User service
+export const userService = {
+  getAllUsers: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get users');
+    }
+    
+    return response.json();
+  },
+  
+  getUserById: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get user');
+    }
+    
+    return response.json();
+  },
+  
+  getCurrentUser: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get current user');
+    }
+    
+    return response.json();
+  },
+  
+  updateUser: async (id: number, data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update user');
+    }
+    
+    return response.json();
+  },
+  
+  deleteUser: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete user');
+    }
+    
+    return response.json();
+  }
 }; 

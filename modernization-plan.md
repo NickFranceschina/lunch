@@ -15,12 +15,12 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
   - [x] New Random button
   - [x] Menu bar with Administer options
   - [x] Windows 98-style UI with titlebar and status bar
-- [ ] Create additional UI components:
+- [x] Create additional UI components:
   - [x] User Info panel
   - [x] Group Info panel
   - [x] Restaurants panel
   - [x] Login dialog
-  - [ ] Chat windows (User and Group)
+  - [x] Chat windows (User and Group)
 - [x] Implement proper authentication flow:
   - [x] Login/logout functionality
   - [x] Role-based menu access (admin restricted)
@@ -30,6 +30,7 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
   - [x] Vote counting and confirmation
   - [x] User presence tracking
   - [x] Status notifications
+  - [x] Chat messages
 - [ ] Add responsive design for modern screen resolutions
 
 ### 2. Backend (Node.js + TypeScript)
@@ -39,13 +40,13 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
   - [x] Group management
   - [x] Restaurant management
   - [x] Voting system
-  - [ ] Chat functionality
+  - [x] Chat functionality
 - [x] Implement WebSocket server for real-time notifications:
   - [x] Group-based restaurant selection
   - [x] Voting updates
   - [x] User presence tracking
   - [x] Status notifications
-  - [ ] Chat messages
+  - [x] Chat messages
 - [x] Create database schema (SQLite implemented instead of PostgreSQL)
 - [x] Implement data migration from Access database
 
@@ -54,6 +55,7 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
   - [x] Users table
   - [x] Groups table
   - [x] Restaurants table
+  - [x] Chat messages table
 - [x] Develop migration script from Access to new database
 - [x] Implement data validation and sanitization
 
@@ -117,7 +119,7 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
    - [x] Implemented Windows 98-style UI
    - [x] Added status bar for messages
    - [x] Implemented WebSocket for real-time updates
-   - [ ] Implement remaining UI components (chat)
+   - [x] Implemented chat functionality (user-to-user and group chat)
 5. [x] Migrate existing data
 6. [ ] Test thoroughly
 7. [ ] Deploy to production
@@ -142,12 +144,13 @@ This document outlines the plan to convert the legacy client/server VB6 lunch ap
 - API endpoints for users, groups, and restaurants are implemented
 - Voting system is functional with real-time updates
 - Random restaurant selection broadcasts to all group members in real-time
+- Chat functionality is implemented (both user-to-user and group chat)
 
 ## Next Steps
 1. ✅ Implement WebSocket for real-time updates (COMPLETED)
-2. Add chat functionality:
-   - Create chat backend endpoints
-   - Develop user chat and group chat components
+2. ✅ Add chat functionality (COMPLETED):
+   - ✅ Create chat backend endpoints
+   - ✅ Develop user chat and group chat components
 3. Set up testing framework and write tests
 4. Implement error handling and logging
 5. Create deployment configuration
