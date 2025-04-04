@@ -21,6 +21,20 @@
   flex: 1;
 }
 
+.status-separator {
+  width: 1px;
+  height: 16px;
+  background-color: #808080;
+  border-right: 1px solid #ffffff;
+  margin: 0 6px;
+}
+
+.status-username {
+  padding-right: 2px;
+  white-space: nowrap;
+  font-weight: normal;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

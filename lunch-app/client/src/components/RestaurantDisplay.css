@@ -2,13 +2,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-}
-
-.restaurant-header {
-  color: #E0E0E0;
-  font-size: 12px;
-  margin-bottom: 8px;
-  font-family: "MS Sans Serif", Arial, sans-serif;
+  margin-top: 5px;
 }
 
 .restaurant-name {

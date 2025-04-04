@@ -587,15 +587,18 @@ const MainWindow: React.FC = () => {
           <div className="application-content">
             {isLoggedIn ? (
               <>
-                <RestaurantDisplay restaurantName={restaurantName} />
-                <div style={{ marginTop: '20px' }}>
+                <div className="header-row">
+                  <div className="lunch-served">
+                    <span>Lunch is Served:</span>
+                  </div>
                   <LEDIndicator 
                     confirmed={confirmed} 
-                    currentUser={currentUser}
                     yesVotes={yesVotes}
                     noVotes={noVotes}
                   />
                 </div>
+                
+                <RestaurantDisplay restaurantName={restaurantName} />
                 
                 {currentGroup && (
                   <div className="vote-counts">
@@ -621,7 +624,16 @@ const MainWindow: React.FC = () => {
           </div>
         </div>
         
-        <StatusBar message={statusMessage} isVisible={showStatus} />
+        <StatusBar 
+          message={
+            isLoggedIn && statusMessage === '' ? 
+            (confirmed ? 'Status: Confirmed' : 
+            (yesVotes + noVotes === 0 ? 'Waiting for votes' : 'Voting in progress')) 
+            : statusMessage
+          } 
+          isVisible={showStatus || isLoggedIn}
+          username={currentUser}
+        />
       </div>
       
       <LoginDialog

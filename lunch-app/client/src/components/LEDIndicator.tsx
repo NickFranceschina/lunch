@@ -3,14 +3,12 @@ import './LEDIndicator.css';
 
 interface LEDIndicatorProps {
   confirmed: boolean;
-  currentUser?: string;
   yesVotes?: number;
   noVotes?: number;
 }
 
 const LEDIndicator: React.FC<LEDIndicatorProps> = ({ 
   confirmed, 
-  currentUser, 
   yesVotes = 0, 
   noVotes = 0 
 }) => {
@@ -37,11 +35,8 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = ({
   
   return (
     <div className="led-container">
+      <span className="confirmed-label">Confirmed:</span>
       <div className={`led ${getLedClass()}`} />
-      <span className="led-label">
-        {currentUser ? `${currentUser} - ` : ''}
-        Status: {confirmed ? 'Confirmed' : (yesVotes + noVotes === 0 ? 'Waiting for votes' : 'Voting in progress')}
-      </span>
     </div>
   );
 };
