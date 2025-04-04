@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './LoginDialog.css';
 import './Win98Panel.css';
+import useDraggable from '../hooks/useDraggable';
 
 interface LoginDialogProps {
   onLogin: (username: string, password: string) => void;
@@ -11,6 +12,7 @@ interface LoginDialogProps {
 const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
 
   // Handle Escape key to cancel
   useEffect(() => {
@@ -29,13 +31,14 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
     };
   }, [isVisible, onCancel]);
 
-  // Reset form when dialog opens
+  // Reset form and position when dialog becomes visible
   useEffect(() => {
     if (isVisible) {
       setUsername('');
       setPassword('');
+      resetPosition();
     }
-  }, [isVisible]);
+  }, [isVisible]); // Remove resetPosition from dependency array since it's now memoized
 
   if (!isVisible) return null;
 
@@ -46,8 +49,21 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
 
   return (
     <div className="win98-panel-overlay">
-      <div className="win98-panel" style={{ width: '320px' }}>
-        <div className="win98-panel-header">
+      <div 
+        className="win98-panel" 
+        style={{ 
+          width: '320px',
+          position: 'absolute',
+          top: `${position.y}px`,
+          left: `${position.x}px`
+        }}
+        ref={containerRef}
+      >
+        <div 
+          className="win98-panel-header"
+          ref={dragHandleRef}
+          style={{ cursor: 'move' }}
+        >
           <div className="win98-panel-title">Login</div>
           <button className="win98-panel-close" onClick={onCancel}>×</button>
         </div>
@@ -98,6 +114,6 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
       </div>
     </div>
   );
-};
+}
 
 export default LoginDialog; 

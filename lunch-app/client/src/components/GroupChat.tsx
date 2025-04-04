@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useWebSocket } from '../services';
 import { Group } from '../types/Group';
 import './GroupChat.css';
+import useDraggable from '../hooks/useDraggable';
 
 interface GroupChatProps {
   group: Group;
@@ -24,6 +25,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
   const { authState } = useAuth();
   const { connected, sendMessage, addMessageListener } = useWebSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { position, containerRef, dragHandleRef } = useDraggable({ x: window.innerWidth - 420, y: 20 });
   
   // Listen for incoming messages
   useEffect(() => {
@@ -121,8 +123,20 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
   };
   
   return (
-    <div className="group-chat-window">
-      <div className="group-chat-header">
+    <div 
+      className="group-chat-window"
+      style={{
+        position: 'absolute',
+        top: `${position.y}px`,
+        left: `${position.x}px`
+      }}
+      ref={containerRef}
+    >
+      <div 
+        className="group-chat-header"
+        ref={dragHandleRef}
+        style={{ cursor: 'move' }}
+      >
         <div className="chat-title">Group Chat: {group.name}</div>
         <button className="close-button" onClick={onClose}>×</button>
       </div>

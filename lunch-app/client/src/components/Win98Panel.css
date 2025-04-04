@@ -9,6 +9,7 @@
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  pointer-events: none;
 }
 
 .win98-panel {
@@ -24,6 +25,7 @@
   font-size: 11px;
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .win98-panel-header {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { groupService } from '../services/api';
 import './GroupPanel.css';
 import './Win98Panel.css';
+import useDraggable from '../hooks/useDraggable';
 
 interface User {
   id: number;
@@ -58,6 +59,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'details' | 'members'>('details');
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
 
   // Fetch groups on component mount
   useEffect(() => {
@@ -66,8 +68,9 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       if (isAdmin) {
         fetchAllUsers();
       }
+      resetPosition();
     }
-  }, [isVisible, isAdmin]);
+  }, [isVisible, isAdmin, resetPosition]);
 
   // Select current group initially
   useEffect(() => {
@@ -339,8 +342,20 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
 
   return (
     <div className="win98-panel-overlay">
-      <div className="win98-panel">
-        <div className="win98-panel-header">
+      <div 
+        className="win98-panel"
+        style={{
+          position: 'absolute',
+          top: `${position.y}px`,
+          left: `${position.x}px`
+        }}
+        ref={containerRef}
+      >
+        <div 
+          className="win98-panel-header"
+          ref={dragHandleRef}
+          style={{ cursor: 'move' }}
+        >
           <div className="win98-panel-title">Group Management</div>
           <button className="win98-panel-close" onClick={onClose}>×</button>
         </div>

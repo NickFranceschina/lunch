@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useWebSocket } from '../services';
 import { User } from '../types/User';
 import './UserChat.css';
+import useDraggable from '../hooks/useDraggable';
 
 interface ChatMessage {
   id?: number;
@@ -23,6 +24,7 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { authState } = useAuth();
   const { connected, sendMessage, addMessageListener } = useWebSocket();
+  const { position, containerRef, dragHandleRef } = useDraggable({ x: window.innerWidth - 420, y: window.innerHeight - 520 });
   
   // Listen for incoming messages
   useEffect(() => {
@@ -117,8 +119,20 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
   };
   
   return (
-    <div className="user-chat-window">
-      <div className="user-chat-header">
+    <div 
+      className="user-chat-window"
+      style={{
+        position: 'absolute',
+        top: `${position.y}px`,
+        left: `${position.x}px`
+      }}
+      ref={containerRef}
+    >
+      <div 
+        className="user-chat-header"
+        ref={dragHandleRef}
+        style={{ cursor: 'move' }}
+      >
         <div className="chat-title">Chat with {recipient.username}</div>
         <button className="close-button" onClick={onClose}>×</button>
       </div>

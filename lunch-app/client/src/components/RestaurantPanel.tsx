@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './RestaurantPanel.css';
 import './Win98Panel.css';
+import useDraggable from '../hooks/useDraggable';
 
 interface Restaurant {
   id: number;
@@ -37,6 +38,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null);
   const [editMode, setEditMode] = useState<boolean>(false);
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
 
   // Fetch restaurants on component mount
   useEffect(() => {
@@ -44,6 +46,13 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       fetchRestaurants();
     }
   }, [isVisible]);
+
+  // Reset position when panel opens
+  useEffect(() => {
+    if (isVisible) {
+      resetPosition();
+    }
+  }, [isVisible, resetPosition]);
 
   // Fetch all restaurants
   const fetchRestaurants = async () => {
@@ -225,8 +234,20 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
 
   return (
     <div className="win98-panel-overlay">
-      <div className="win98-panel">
-        <div className="win98-panel-header">
+      <div 
+        className="win98-panel"
+        style={{
+          position: 'absolute',
+          top: `${position.y}px`,
+          left: `${position.x}px`
+        }}
+        ref={containerRef}
+      >
+        <div 
+          className="win98-panel-header"
+          ref={dragHandleRef}
+          style={{ cursor: 'move' }}
+        >
           <div className="win98-panel-title">Restaurant Management</div>
           <button className="win98-panel-close" onClick={onClose}>×</button>
         </div>

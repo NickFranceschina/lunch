@@ -9,9 +9,6 @@
   border-right-color: #848484;
   border-bottom-color: #848484;
   background-color: #c0c0c0;
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
   z-index: 1000;
   font-family: 'Tahoma', sans-serif;
   font-size: 11px;

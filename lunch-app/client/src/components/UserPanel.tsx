@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { websocketService } from '../services/websocket.service';
 import './UserPanel.css';
 import './Win98Panel.css';
+import useDraggable from '../hooks/useDraggable';
 
 interface User {
   id: number;
@@ -46,6 +47,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showOnlyLoggedIn, setShowOnlyLoggedIn] = useState<boolean>(true);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
 
   // Fetch users on component mount and set up WebSocket listener
   useEffect(() => {
@@ -72,6 +74,13 @@ const UserPanel: React.FC<UserPanelProps> = ({
       };
     }
   }, [isVisible, showOnlyLoggedIn]);
+
+  // Reset position when panel opens
+  useEffect(() => {
+    if (isVisible) {
+      resetPosition();
+    }
+  }, [isVisible, resetPosition]);
 
   // Fetch all users
   const fetchUsers = async () => {
@@ -234,8 +243,20 @@ const UserPanel: React.FC<UserPanelProps> = ({
 
   return (
     <div className="win98-panel-overlay">
-      <div className="win98-panel">
-        <div className="win98-panel-header">
+      <div 
+        className="win98-panel"
+        style={{
+          position: 'absolute',
+          top: `${position.y}px`,
+          left: `${position.x}px`
+        }}
+        ref={containerRef}
+      >
+        <div 
+          className="win98-panel-header"
+          ref={dragHandleRef}
+          style={{ cursor: 'move' }}
+        >
           <div className="win98-panel-title">User Management</div>
           <button className="win98-panel-close" onClick={onClose}>×</button>
         </div>
