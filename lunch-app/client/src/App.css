@@ -11,6 +11,19 @@
   background-attachment: fixed;
   font-family: Arial, sans-serif;
   position: relative; /* Ensure proper positioning for fixed children */
+  overflow: hidden; /* Prevent scrollbars */
+}
+
+/* Desktop area */
+.App::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 28px; /* Above the taskbar */
+  z-index: 0;
+  pointer-events: none;
 }
 
 .App-logo {

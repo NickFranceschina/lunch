@@ -1,0 +1,255 @@
+.help-window-container {
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.help-window {
+  width: 700px;
+  height: 500px;
+  background-color: #c0c0c0;
+  border: 3px solid;
+  border-color: #dfdfdf #000000 #000000 #dfdfdf;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  font-family: "MS Sans Serif", Arial, sans-serif;
+  color: #000000;
+}
+
+.help-title-bar {
+  height: 22px;
+  background: linear-gradient(90deg, #000080, #1084d0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px;
+  color: white;
+  font-weight: bold;
+  font-size: 11px;
+  cursor: move;
+}
+
+.help-title-bar-text {
+  display: flex;
+  align-items: center;
+}
+
+.help-title-icon {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.help-title-bar-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.help-title-bar-controls button {
+  width: 16px;
+  height: 14px;
+  background-color: #c0c0c0;
+  border: 1px solid #000000;
+  border-top-color: #ffffff;
+  border-left-color: #ffffff;
+  box-shadow: none;
+  font-size: 9px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  position: relative;
+  cursor: pointer;
+}
+
+.help-title-bar-controls button:active {
+  border-color: #808080 #ffffff #ffffff #808080;
+  padding: 1px 0 0 1px;
+}
+
+.help-toolbar {
+  height: 34px;
+  background-color: #c0c0c0;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  border-bottom: 1px solid #808080;
+}
+
+.help-toolbar-button {
+  height: 24px;
+  margin: 0 2px;
+  padding: 2px 8px;
+  background-color: #c0c0c0;
+  border: 1px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-toolbar-button:active {
+  border-color: #808080 #ffffff #ffffff #808080;
+  padding: 3px 7px 1px 9px;
+}
+
+.help-toolbar-icon {
+  font-size: 16px;
+}
+
+.help-content-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  background-color: #ffffff;
+  border: 1px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  margin: 4px;
+}
+
+.help-sidebar {
+  width: 200px;
+  background-color: #ffffcc;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #808080;
+}
+
+.help-tabs {
+  display: flex;
+  background-color: #c0c0c0;
+}
+
+.help-tab {
+  padding: 4px 8px;
+  font-size: 11px;
+  background-color: #c0c0c0;
+  border: 1px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  cursor: pointer;
+  flex: 1;
+  text-align: center;
+}
+
+.help-tab-active {
+  background-color: #ffffcc;
+  border-bottom-color: #ffffcc;
+}
+
+.help-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.help-tree-item {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.help-tree-item:hover {
+  background-color: #c0c0c0;
+}
+
+.help-tree-icon {
+  margin-right: 4px;
+}
+
+.help-tree-text {
+  font-size: 11px;
+}
+
+.help-tree-indent {
+  margin-left: 16px;
+}
+
+.help-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  background-color: #ffffff;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Markdown Styles */
+.help-heading-1 {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 0 12px 0;
+  color: #000080;
+  border-bottom: 1px solid #000080;
+  padding-bottom: 4px;
+}
+
+.help-heading-2 {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 16px 0 8px 0;
+  color: #000080;
+}
+
+.help-heading-3 {
+  font-size: 14px;
+  font-weight: bold;
+  margin: 12px 0 6px 0;
+}
+
+.help-paragraph {
+  margin: 0 0 8px 0;
+}
+
+.help-list, .help-ordered-list {
+  margin: 0 0 8px 0;
+  padding-left: 24px;
+}
+
+.help-list-item {
+  margin: 2px 0;
+}
+
+.help-link {
+  color: #0000FF;
+  text-decoration: underline;
+}
+
+.help-code {
+  font-family: "Courier New", monospace;
+  background-color: #f0f0f0;
+  padding: 2px 4px;
+  border: 1px solid #dcdcdc;
+}
+
+.help-pre {
+  background-color: #f0f0f0;
+  padding: 8px;
+  border: 1px solid #dcdcdc;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.help-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  font-style: italic;
+  color: #808080;
+}
+
+.help-statusbar {
+  height: 20px;
+  background-color: #c0c0c0;
+  border-top: 1px solid #808080;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.help-status-text {
+  font-size: 11px;
+  color: #000000;
+} 
