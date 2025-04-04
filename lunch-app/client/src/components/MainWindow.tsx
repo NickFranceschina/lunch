@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LEDIndicator from './LEDIndicator';
 import RestaurantDisplay from './RestaurantDisplay';
 import VotingControls from './VotingControls';
@@ -7,6 +7,7 @@ import RestaurantPanel from './RestaurantPanel';
 import UserPanel from './UserPanel';
 import GroupPanel from './GroupPanel';
 import { authService, restaurantService } from '../services/api';
+import { websocketService } from '../services/websocket.service';
 import './MainWindow.css';
 
 const MainWindow: React.FC = () => {
@@ -22,6 +23,77 @@ const MainWindow: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState<number | null>(null);
   const [token, setToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
+
+  // Set up WebSocket event listeners
+  const setupWebSocketListeners = useCallback(() => {
+    // Listen for restaurant selection updates
+    const selectionUnsubscribe = websocketService.addMessageListener('restaurant_selection', (data: any) => {
+      setRestaurantName(data.restaurantName);
+      setConfirmed(data.confirmed);
+    });
+
+    // Listen for vote updates
+    const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
+      console.log('Vote update:', data);
+      // You could update a UI element showing who voted
+    });
+
+    // Listen for notifications
+    const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
+      alert(data.message);
+    });
+
+    // Return cleanup function
+    return () => {
+      selectionUnsubscribe();
+      voteUnsubscribe();
+      notificationUnsubscribe();
+    };
+  }, []);
+
+  // Connect to WebSocket when logged in
+  useEffect(() => {
+    if (isLoggedIn && token) {
+      console.log("Attempting WebSocket connection with token:", token.substring(0, 10) + "...");
+      
+      websocketService.connect(token)
+        .then(() => {
+          setWsConnected(true);
+          console.log('WebSocket connected successfully');
+          
+          // Send periodic pings to keep connection alive
+          const pingInterval = setInterval(() => {
+            if (isLoggedIn) {
+              websocketService.ping();
+            } else {
+              clearInterval(pingInterval);
+            }
+          }, 30000); // Every 30 seconds
+          
+          return () => {
+            clearInterval(pingInterval);
+          };
+        })
+        .catch(error => {
+          console.error('WebSocket connection failed:', error);
+          setWsConnected(false);
+        });
+      
+      // Set up listeners
+      const unsubscribe = setupWebSocketListeners();
+      
+      // Clean up on unmount or logout
+      return () => {
+        console.log("Cleaning up WebSocket connection");
+        unsubscribe();
+        if (wsConnected) {
+          websocketService.disconnect();
+          setWsConnected(false);
+        }
+      };
+    }
+  }, [isLoggedIn, token, setupWebSocketListeners, wsConnected]);
 
   // Handle login
   const handleLoginClick = () => {
@@ -44,6 +116,9 @@ const MainWindow: React.FC = () => {
         setCurrentGroup(response.user.groups[0].id);
       }
       
+      // Save token to localStorage for reconnection
+      localStorage.setItem('token', response.token);
+      
       setShowLoginDialog(false);
     } catch (error) {
       console.error('Login failed:', error);
@@ -59,6 +134,11 @@ const MainWindow: React.FC = () => {
   const handleLogout = async () => {
     try {
       await authService.logout(token);
+      // Disconnect WebSocket
+      websocketService.disconnect();
+      setWsConnected(false);
+      
+      // Clear auth state
       setIsLoggedIn(false);
       setCurrentUser('');
       setCurrentUserId(0);
@@ -67,48 +147,69 @@ const MainWindow: React.FC = () => {
       setConfirmed(false);
       setToken('');
       setIsAdmin(false);
+      
+      // Remove token from localStorage
+      localStorage.removeItem('token');
     } catch (error) {
       console.error('Logout failed:', error);
     }
   };
 
-  // Voting functions
+  // Voting functions using WebSocket
   const handleVoteYes = async () => {
     if (!currentGroup) return;
     
-    try {
-      const response = await restaurantService.voteYes(currentGroup, token);
-      setConfirmed(response.isConfirmed);
-      alert('Vote was cast');
-    } catch (error) {
-      console.error('Failed to vote yes:', error);
-      alert('Failed to vote yes');
+    if (wsConnected) {
+      // Send vote through WebSocket
+      websocketService.sendVote(true);
+    } else {
+      // Fallback to REST API
+      try {
+        const response = await restaurantService.voteYes(currentGroup, token);
+        setConfirmed(response.isConfirmed);
+        alert('Vote was cast');
+      } catch (error) {
+        console.error('Failed to vote yes:', error);
+        alert('Failed to vote yes');
+      }
     }
   };
 
   const handleVoteNo = async () => {
     if (!currentGroup) return;
     
-    try {
-      const response = await restaurantService.voteNo(currentGroup, token);
-      setConfirmed(response.isConfirmed);
-      alert('Vote was cast');
-    } catch (error) {
-      console.error('Failed to vote no:', error);
-      alert('Failed to vote no');
+    if (wsConnected) {
+      // Send vote through WebSocket
+      websocketService.sendVote(false);
+    } else {
+      // Fallback to REST API
+      try {
+        const response = await restaurantService.voteNo(currentGroup, token);
+        setConfirmed(response.isConfirmed);
+        alert('Vote was cast');
+      } catch (error) {
+        console.error('Failed to vote no:', error);
+        alert('Failed to vote no');
+      }
     }
   };
 
   const handleNewRandom = async () => {
     if (!currentGroup) return;
     
-    try {
-      const response = await restaurantService.getRandomRestaurant(currentGroup, token);
-      setRestaurantName(response.restaurant.name);
-      setConfirmed(false);
-    } catch (error) {
-      console.error('Failed to get random restaurant:', error);
-      alert('Failed to get random restaurant');
+    if (wsConnected) {
+      // Send new random request through WebSocket
+      websocketService.sendNewRandom(currentGroup);
+    } else {
+      // Fallback to REST API
+      try {
+        const response = await restaurantService.getRandomRestaurant(currentGroup, token);
+        setRestaurantName(response.restaurant.name);
+        setConfirmed(false);
+      } catch (error) {
+        console.error('Failed to get random restaurant:', error);
+        alert('Failed to get random restaurant');
+      }
     }
   };
 
@@ -154,6 +255,7 @@ const MainWindow: React.FC = () => {
           </div>
         </div>
         <LEDIndicator confirmed={confirmed} />
+        {wsConnected && <div className="ws-indicator">🔄</div>}
       </div>
 
       <RestaurantDisplay restaurantName={restaurantName} />
@@ -192,6 +294,7 @@ const MainWindow: React.FC = () => {
         token={token}
         currentUserId={currentUserId}
         currentGroupId={currentGroup || undefined}
+        isAdmin={isAdmin}
       />
     </div>
   );

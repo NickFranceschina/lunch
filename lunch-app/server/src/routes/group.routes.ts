@@ -53,4 +53,18 @@ router.post('/:id/join', authenticateToken, groupController.joinGroup);
  */
 router.post('/:id/leave', authenticateToken, groupController.leaveGroup);
 
+/**
+ * @route   POST /api/groups/:id/users/:userId
+ * @desc    Add a user to a group (admin only)
+ * @access  Private (Admin)
+ */
+router.post('/:id/users/:userId', authenticateToken, isAdmin, groupController.addUserToGroup);
+
+/**
+ * @route   DELETE /api/groups/:id/users/:userId
+ * @desc    Remove a user from a group (admin only)
+ * @access  Private (Admin)
+ */
+router.delete('/:id/users/:userId', authenticateToken, isAdmin, groupController.removeUserFromGroup);
+
 export default router; 

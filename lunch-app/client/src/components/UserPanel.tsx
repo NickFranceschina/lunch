@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { websocketService } from '../services/websocket.service';
 import './UserPanel.css';
 
 interface User {
@@ -43,10 +44,29 @@ const UserPanel: React.FC<UserPanelProps> = ({
   const [showOnlyLoggedIn, setShowOnlyLoggedIn] = useState<boolean>(true);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
-  // Fetch users on component mount
+  // Fetch users on component mount and set up WebSocket listener
   useEffect(() => {
     if (isVisible) {
       fetchUsers();
+      
+      // Set up WebSocket listener for user presence updates
+      const unsubscribe = websocketService.addMessageListener('user_presence_update', (data: any) => {
+        console.log('Received user presence update:', data);
+        // Update the user's isLoggedIn status in our local state
+        setUsers(prevUsers => {
+          return prevUsers.map(user => {
+            if (user.id === data.userId) {
+              return { ...user, isLoggedIn: data.isLoggedIn };
+            }
+            return user;
+          });
+        });
+      });
+      
+      // Clean up listener when component unmounts or becomes invisible
+      return () => {
+        unsubscribe();
+      };
     }
   }, [isVisible, showOnlyLoggedIn]);
 

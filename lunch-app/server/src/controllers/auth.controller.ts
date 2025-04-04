@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { User } from '../models/User';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
+import { JWT_SECRET, JWT_EXPIRES_IN } from '../config/auth';
 
 const userRepository = AppDataSource.getRepository(User);
 
@@ -53,10 +54,11 @@ export const login = async (req: Request, res: Response) => {
       { 
         id: user.id, 
         username: user.username,
-        isAdmin: user.isAdmin 
+        isAdmin: user.isAdmin,
+        currentGroupId: user.currentGroupId 
       },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     res.status(200).json({

@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { groupService } from '../services/api';
 import './GroupPanel.css';
+
+interface User {
+  id: number;
+  username: string;
+}
 
 interface Group {
   id: number;
@@ -13,7 +19,7 @@ interface Group {
   yesVotes: number;
   noVotes: number;
   isConfirmed: boolean;
-  users?: { id: number; username: string }[];
+  users?: User[];
 }
 
 interface GroupPanelProps {
@@ -22,6 +28,7 @@ interface GroupPanelProps {
   token: string;
   currentUserId: number;
   currentGroupId?: number;
+  isAdmin?: boolean;
 }
 
 const GroupPanel: React.FC<GroupPanelProps> = ({
@@ -29,10 +36,13 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   onClose,
   token,
   currentUserId,
-  currentGroupId
+  currentGroupId,
+  isAdmin = false
 }) => {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
@@ -45,13 +55,17 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     notificationTime: '12:00'
   });
   const [editMode, setEditMode] = useState<boolean>(false);
+  const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
 
   // Fetch groups on component mount
   useEffect(() => {
     if (isVisible) {
       fetchGroups();
+      if (isAdmin) {
+        fetchAllUsers();
+      }
     }
-  }, [isVisible]);
+  }, [isVisible, isAdmin]);
 
   // Select current group initially
   useEffect(() => {
@@ -72,18 +86,8 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const fetchGroups = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/groups', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch groups');
-      }
-
-      const data = await response.json();
-      setGroups(data.data);
+      const response = await groupService.getAllGroups(token);
+      setGroups(response.data);
       setError(null);
     } catch (err) {
       setError('Error loading groups. Please try again.');
@@ -93,13 +97,38 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     }
   };
 
+  // Fetch all users (admin only)
+  const fetchAllUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+
+      const data = await response.json();
+      setAllUsers(data.data);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  };
+
   // Handle form input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
       [name]: value
     });
+  };
+
+  // Handle user selection change
+  const handleUserSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedUser(parseInt(e.target.value));
   };
 
   // Select a group and update form data
@@ -128,6 +157,8 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       name: '', // Only used for new groups
       description: ''
     });
+    
+    setShowUserSelector(false);
   };
 
   // Handle form submission for new group
@@ -137,18 +168,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       
-      const response = await fetch('http://localhost:3001/api/groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create group');
-      }
+      await groupService.createGroup(formData, token);
 
       // Reset form and reload groups
       setFormData({
@@ -172,20 +192,9 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       
-      const response = await fetch(`http://localhost:3001/api/groups/${selectedGroup.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          notificationTime: formData.notificationTime
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update notification time');
-      }
+      await groupService.updateGroup(selectedGroup.id, {
+        notificationTime: formData.notificationTime
+      }, token);
 
       await fetchGroups();
       alert('Notification time updated successfully');
@@ -202,16 +211,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       
-      const response = await fetch(`http://localhost:3001/api/groups/${groupId}/join`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to join group');
-      }
+      await groupService.joinGroup(groupId, token);
 
       await fetchGroups();
       alert('Successfully joined group');
@@ -228,16 +228,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       
-      const response = await fetch(`http://localhost:3001/api/groups/${groupId}/leave`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to leave group');
-      }
+      await groupService.leaveGroup(groupId, token);
 
       await fetchGroups();
       alert('Successfully left group');
@@ -246,6 +237,53 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       console.error('Error leaving group:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add user to group (admin only)
+  const handleAddUserToGroup = async () => {
+    if (!selectedGroup || !selectedUser) return;
+    
+    try {
+      setLoading(true);
+      
+      await groupService.addUserToGroup(selectedGroup.id, selectedUser, token);
+      
+      await fetchGroups();
+      alert('User successfully added to group');
+      setShowUserSelector(false);
+    } catch (err) {
+      setError('Error adding user to group. Please try again.');
+      console.error('Error adding user to group:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Remove user from group (admin only)
+  const handleRemoveUserFromGroup = async (userId: number) => {
+    if (!selectedGroup) return;
+    
+    // Don't allow removing yourself
+    if (userId === currentUserId) {
+      alert('You cannot remove yourself from a group this way. Use the Leave Group button instead.');
+      return;
+    }
+    
+    if (window.confirm('Are you sure you want to remove this user from the group?')) {
+      try {
+        setLoading(true);
+        
+        await groupService.removeUserFromGroup(selectedGroup.id, userId, token);
+        
+        await fetchGroups();
+        alert('User successfully removed from group');
+      } catch (err) {
+        setError('Error removing user from group. Please try again.');
+        console.error('Error removing user from group:', err);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -285,7 +323,17 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     }
   };
 
+  // Toggle user selector
+  const handleToggleUserSelector = () => {
+    setShowUserSelector(!showUserSelector);
+  };
+
   if (!isVisible) return null;
+
+  // Filter out users already in the group for the dropdown
+  const availableUsers = allUsers.filter(user => 
+    !selectedGroup?.users?.some(groupUser => groupUser.id === user.id)
+  );
 
   return (
     <div className="group-panel-overlay">
@@ -445,14 +493,66 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                 <div className="members-list">
                   <h3>Group Members</h3>
                   {selectedGroup.users && selectedGroup.users.length > 0 ? (
-                    <ul>
-                      {selectedGroup.users.map(user => (
-                        <li key={user.id}>
-                          {user.username}
-                          {user.id === currentUserId && <span className="current-user-indicator"> (You)</span>}
-                        </li>
-                      ))}
-                    </ul>
+                    <div>
+                      <ul className="user-list">
+                        {selectedGroup.users.map(user => (
+                          <li key={user.id} className="user-list-item">
+                            {user.username}
+                            {user.id === currentUserId && <span className="current-user-indicator"> (You)</span>}
+                            {isAdmin && user.id !== currentUserId && (
+                              <button 
+                                className="remove-user-button"
+                                onClick={() => handleRemoveUserFromGroup(user.id)}
+                                title="Remove user from group"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      {isAdmin && (
+                        <div className="admin-actions">
+                          {!showUserSelector ? (
+                            <button 
+                              className="add-button"
+                              onClick={handleToggleUserSelector}
+                            >
+                              Add User to Group
+                            </button>
+                          ) : (
+                            <div className="user-selector">
+                              <select 
+                                value={selectedUser || ""}
+                                onChange={handleUserSelect}
+                              >
+                                <option value="">-- Select User --</option>
+                                {availableUsers.map(user => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.username}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="button-group">
+                                <button 
+                                  onClick={handleAddUserToGroup}
+                                  disabled={!selectedUser || loading}
+                                  className="add-button"
+                                >
+                                  Add User
+                                </button>
+                                <button 
+                                  onClick={handleToggleUserSelector}
+                                  className="cancel-button"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <p>No members in this group</p>
                   )}

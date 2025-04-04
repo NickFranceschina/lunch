@@ -2,8 +2,9 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Restaurant } from '../models/Restaurant';
 import { Group } from '../models/Group';
-import { GroupRestaurant } from '../models/GroupRestaurant';
+import { GroupRestaurant, OccurrenceRating } from '../models/GroupRestaurant';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { getWebSocketServer } from '../config/websocket';
 
 const restaurantRepository = AppDataSource.getRepository(Restaurant);
 const groupRepository = AppDataSource.getRepository(Group);
@@ -238,7 +239,18 @@ export const getRandomRestaurant = async (req: AuthRequest, res: Response) => {
     group.yesVotes = 0;
     group.noVotes = 0;
     group.currentRestaurant = randomRestaurant;
+    group.isConfirmed = false;
     await groupRepository.save(group);
+    
+    // Broadcast the restaurant selection via WebSocket
+    const wsServer = getWebSocketServer();
+    if (wsServer) {
+      wsServer.sendRestaurantSelection(
+        parseInt(groupId),
+        randomRestaurant.name,
+        false // not confirmed yet
+      );
+    }
     
     res.status(200).json({
       success: true,
@@ -260,6 +272,8 @@ export const voteForRestaurant = async (req: AuthRequest, res: Response) => {
   try {
     const { groupId } = req.params;
     const { vote } = req.body;
+    const userId = req.userId;
+    const username = req.body.username || 'User'; // Fallback to generic name if not provided
     
     if (!vote || (vote !== 'yes' && vote !== 'no')) {
       return res.status(400).json({
@@ -297,9 +311,43 @@ export const voteForRestaurant = async (req: AuthRequest, res: Response) => {
     
     // Check if the restaurant is confirmed (more yes than no votes)
     const isConfirmed = group.yesVotes > group.noVotes;
+    const wasConfirmedBefore = group.isConfirmed;
     group.isConfirmed = isConfirmed;
     
     await groupRepository.save(group);
+    
+    // Broadcast the vote via WebSocket
+    const wsServer = getWebSocketServer();
+    if (wsServer) {
+      wsServer.broadcastToGroup(parseInt(groupId), {
+        type: 'vote_update',
+        data: {
+          userId,
+          username,
+          vote: vote === 'yes',
+          yesVotes: group.yesVotes,
+          noVotes: group.noVotes,
+          isConfirmed
+        }
+      });
+      
+      // If confirmation status changed, send restaurant selection update
+      if (wasConfirmedBefore !== isConfirmed) {
+        wsServer.sendRestaurantSelection(
+          parseInt(groupId),
+          group.currentRestaurant.name,
+          isConfirmed
+        );
+        
+        // Send notification if restaurant is now confirmed
+        if (isConfirmed) {
+          wsServer.sendGroupNotification(
+            parseInt(groupId),
+            `Restaurant "${group.currentRestaurant.name}" has been confirmed!`
+          );
+        }
+      }
+    }
     
     res.status(200).json({
       success: true,

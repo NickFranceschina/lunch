@@ -156,4 +156,137 @@ export const restaurantService = {
     
     return response.json();
   }
+};
+
+// Group service
+export const groupService = {
+  getAllGroups: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get groups');
+    }
+    
+    return response.json();
+  },
+  
+  getGroupById: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get group');
+    }
+    
+    return response.json();
+  },
+  
+  createGroup: async (data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to create group');
+    }
+    
+    return response.json();
+  },
+  
+  updateGroup: async (id: number, data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update group');
+    }
+    
+    return response.json();
+  },
+  
+  joinGroup: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to join group');
+    }
+    
+    return response.json();
+  },
+  
+  leaveGroup: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/leave`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to leave group');
+    }
+    
+    return response.json();
+  },
+  
+  addUserToGroup: async (groupId: number, userId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/users/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add user to group');
+    }
+    
+    return response.json();
+  },
+  
+  removeUserFromGroup: async (groupId: number, userId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/users/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to remove user from group');
+    }
+    
+    return response.json();
+  }
 }; 

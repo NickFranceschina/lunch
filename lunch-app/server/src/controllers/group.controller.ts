@@ -330,4 +330,137 @@ export const leaveGroup = async (req: AuthRequest, res: Response) => {
       message: 'Server error'
     });
   }
+};
+
+/**
+ * Add a user to a group (admin only)
+ */
+export const addUserToGroup = async (req: AuthRequest, res: Response) => {
+  try {
+    const groupId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    
+    // Check if group exists
+    const group = await groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+    
+    // Check if user exists
+    const user = await userRepository.findOne({
+      where: { id: userId },
+      relations: ['groups']
+    });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is already in the group
+    if (user.groups && user.groups.some(g => g.id === groupId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is already a member of this group'
+      });
+    }
+
+    // Add user to group
+    if (!user.groups) user.groups = [];
+    user.groups.push(group);
+    
+    // If user has no current group, set this as their current group
+    if (!user.currentGroupId) {
+      user.currentGroupId = groupId;
+    }
+    
+    await userRepository.save(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'User successfully added to group',
+      data: { 
+        groupId, 
+        userId,
+        username: user.username
+      }
+    });
+  } catch (error) {
+    console.error('Error adding user to group:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+/**
+ * Remove a user from a group (admin only)
+ */
+export const removeUserFromGroup = async (req: AuthRequest, res: Response) => {
+  try {
+    const groupId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    
+    // Check if group exists
+    const group = await groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+    
+    // Check if user exists
+    const user = await userRepository.findOne({
+      where: { id: userId },
+      relations: ['groups']
+    });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is in the group
+    if (!user.groups || !user.groups.some(g => g.id === groupId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not a member of this group'
+      });
+    }
+
+    // Remove user from group
+    user.groups = user.groups.filter(g => g.id !== groupId);
+    
+    // If the user's current group is the one being left, set currentGroupId to undefined or another group
+    if (user.currentGroupId === groupId) {
+      user.currentGroupId = user.groups.length > 0 ? user.groups[0].id : undefined;
+    }
+    
+    await userRepository.save(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'User successfully removed from group',
+      data: { 
+        groupId, 
+        userId,
+        username: user.username
+      }
+    });
+  } catch (error) {
+    console.error('Error removing user from group:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 }; 
