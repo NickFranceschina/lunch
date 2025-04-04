@@ -312,44 +312,46 @@ const MainWindow: React.FC = () => {
       </div>
       
       <div className="window-body">
-        <div className="menu-bar">
-          <div className="menu-item">
-            <button 
-              onClick={isLoggedIn ? handleLogout : handleLoginClick}
-              className="menu-button"
-            >
-              {isLoggedIn ? 'Logout' : 'Login'}
-            </button>
-          </div>
-          
-          {isLoggedIn && (
-            <>
-              <div className="menu-item">
-                <button 
-                  onClick={handleStartGroupChat}
-                  className="menu-button"
-                >
-                  Group Chat
-                </button>
-              </div>
-              
-              {isAdmin && (
-                <div className="menu-item dropdown">
-                  <button className="menu-button">Administer</button>
-                  <div className="dropdown-content">
-                    <button onClick={handleRestaurantPanelToggle}>Restaurants</button>
-                    <button onClick={handleUserPanelToggle}>Users</button>
-                    <button onClick={handleGroupPanelToggle}>Groups</button>
-                  </div>
+        <div className="top-section">
+          <div className="menu-bar">
+            <div className="menu-item">
+              <button 
+                onClick={isLoggedIn ? handleLogout : handleLoginClick}
+                className="menu-button"
+              >
+                {isLoggedIn ? 'Logout' : 'Login'}
+              </button>
+            </div>
+            
+            {isLoggedIn && (
+              <>
+                <div className="menu-item">
+                  <button 
+                    onClick={handleStartGroupChat}
+                    className="menu-button"
+                  >
+                    Group Chat
+                  </button>
                 </div>
-              )}
-            </>
-          )}
+                
+                {isAdmin && (
+                  <div className="menu-item dropdown">
+                    <button className="menu-button">Administer</button>
+                    <div className="dropdown-content">
+                      <button onClick={handleRestaurantPanelToggle}>Restaurants</button>
+                      <button onClick={handleUserPanelToggle}>Users</button>
+                      <button onClick={handleGroupPanelToggle}>Groups</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <LEDIndicator confirmed={confirmed} />
         </div>
         
         <div className="content">
           <div className="application-content">
-            <LEDIndicator confirmed={confirmed} />
             <RestaurantDisplay restaurantName={restaurantName} />
             <VotingControls 
               onVoteYes={handleVoteYes} 
