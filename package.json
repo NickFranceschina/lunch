@@ -1,0 +1,20 @@
+{
+  "name": "lunch-app-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "lunch-app/client",
+    "lunch-app/server"
+  ],
+  "scripts": {
+    "start": "concurrently \"npm run start:client\" \"npm run start:server\" \"npm run start:browser-tools\"",
+    "start:client": "npm start --workspace=lunch-app/client",
+    "start:server": "npm run dev --workspace=lunch-app/server",
+    "start:browser-tools": "npx @agentdeskai/browser-tools-server@latest",
+    "build": "npm run build --workspaces",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 

@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "name": "✨ LUNCH-APP (root)",
+      "path": "."
+    },
+    {
+      "name": "📱 Client",
+      "path": "lunch-app/client"
+    },
+    {
+      "name": "🖥️ Server",
+      "path": "lunch-app/server"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "lunch-app/": true
+    },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  }
+} 

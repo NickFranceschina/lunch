@@ -45,21 +45,28 @@ The modernization is well underway with the following features implemented:
   - `database/` - Database scripts and migrations
   - `shared/` - Shared types and utilities
 
-## Getting Started
+## Development Setup
 
-1. Review the modernization plan in `modernization-plan.md`
-2. Install dependencies for both client and server:
+### VS Code Workspace
+
+The project includes a VS Code workspace configuration (`lunch-app.code-workspace`) that organizes the project into logical components:
+- ✨ LUNCH-APP (root) - Project root with shared configuration
+- 📱 Client - React frontend application
+- 🖥️ Server - Node.js backend server
+
+To use the workspace:
+1. Open VS Code
+2. File -> Open Workspace from File...
+3. Select `lunch-app.code-workspace`
+
+### Getting Started
+
+1. Install all dependencies from the project root:
 ```bash
-# Install server dependencies
-cd lunch-app/server
-npm install
-
-# Install client dependencies
-cd ../client
 npm install
 ```
 
-3. Database Setup:
+2. Database Setup:
    - The application uses SQLite for its database
    - The database file (`lunch.db`) is not included in version control
    - Initialize the database with seed data:
@@ -72,31 +79,38 @@ npm run seed
      - Default lunch group
      - Sample restaurants
 
-4. Running the Application:
-```bash
-# Start the server (in lunch-app/server directory)
-npm run dev
+3. Running the Application:
 
-# In another terminal, start the client (in lunch-app/client directory)
+From the project root, start all services with a single command:
+```bash
 npm start
 ```
-   - The server runs on port 3001
-   - The client runs on port 3000
-   - Access the application at http://localhost:3000
 
-5. Feature Highlights:
-   - Windows 98-style UI with authentic look and feel
-   - Real-time group collaboration for restaurant selection
-   - User presence tracking for administrators
-   - Status bar replacing alert() dialogs for notifications
-   - Role-based access control for admin functionality
-   - Session persistence across page refreshes (tab-specific)
-   - Direct and group chat functionality
-   - Automatic window management
+This will concurrently run:
+- Client (port 3000)
+- Server (port 3001)
+- Browser Tools
 
-6. Next Steps:
-   - Testing infrastructure
-   - Deployment configuration
+Access the application at http://localhost:3000
+
+Individual services can be started separately using:
+- `npm run start:client` - Start only the client
+- `npm run start:server` - Start only the server
+- `npm run start:browser-tools` - Start only the browser tools
+
+### Feature Highlights:
+- Windows 98-style UI with authentic look and feel
+- Real-time group collaboration for restaurant selection
+- User presence tracking for administrators
+- Status bar replacing alert() dialogs for notifications
+- Role-based access control for admin functionality
+- Session persistence across page refreshes (tab-specific)
+- Direct and group chat functionality
+- Automatic window management
+
+### Next Steps:
+- Testing infrastructure
+- Deployment configuration
 
 ## Authentication
 
