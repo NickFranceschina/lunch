@@ -208,11 +208,11 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
 
   // Position at bottom right
   const initialPosition = {
-    x: Math.max(20, window.innerWidth - 420),
-    y: window.innerHeight - chatHeight - 5 // 5px from bottom of screen
+    x: window.innerWidth - 400 - 20, // 400px width, 20px from right edge
+    y: window.innerHeight - 500 - 5 // 500px height, 5px from bottom
   };
   
-  const { position, containerRef, dragHandleRef } = useDraggable(initialPosition, true);
+  const { position, containerRef, dragHandleRef } = useDraggable(`group-chat-${group.id}`, initialPosition, true);
   
   // Listen for incoming messages - use message content and sender for deduplication
   useEffect(() => {

@@ -34,7 +34,7 @@ const UserChat: React.FC<UserChatProps> = ({ recipient, onClose }) => {
     y: window.innerHeight - chatHeight - 5 // 5px from bottom of screen
   };
   
-  const { position, containerRef, dragHandleRef } = useDraggable(initialPosition, true);
+  const { position, containerRef, dragHandleRef } = useDraggable(`user-chat-${recipient.id}`, initialPosition, true);
   
   // Function to reconnect using existing MainWindow connection
   const forceConnectionCheck = async () => {

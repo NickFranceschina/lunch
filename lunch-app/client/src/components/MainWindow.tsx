@@ -25,10 +25,22 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const [restaurantName, setRestaurantName] = useState<string>('');
   const [confirmed, setConfirmed] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [showLoginDialog, setShowLoginDialog] = useState<boolean>(false);
-  const [showRestaurantPanel, setShowRestaurantPanel] = useState<boolean>(false);
-  const [showUserPanel, setShowUserPanel] = useState<boolean>(false);
-  const [showGroupPanel, setShowGroupPanel] = useState<boolean>(false);
+  
+  // Get initial dialog visibility states from sessionStorage
+  const initialLoginDialogVisible = sessionStorage.getItem('window_visibility_login') === 'true';
+  const initialRestaurantPanelVisible = sessionStorage.getItem('window_visibility_restaurant') === 'true';
+  const initialUserPanelVisible = sessionStorage.getItem('window_visibility_user') === 'true';
+  const initialGroupPanelVisible = sessionStorage.getItem('window_visibility_group') === 'true';
+  
+  const [showLoginDialog, setShowLoginDialog] = useState<boolean>(initialLoginDialogVisible);
+  const [showRestaurantPanel, setShowRestaurantPanel] = useState<boolean>(initialRestaurantPanelVisible);
+  const [showUserPanel, setShowUserPanel] = useState<boolean>(initialUserPanelVisible);
+  const [showGroupPanel, setShowGroupPanel] = useState<boolean>(initialGroupPanelVisible);
+  
+  // Get initial chat visibility states - these depend on having recipient/group data
+  const initialUserChatVisible = sessionStorage.getItem('window_visibility_user_chat') === 'true';
+  const initialGroupChatVisible = sessionStorage.getItem('window_visibility_group_chat') === 'true';
+  
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<number>(0);
   const [currentGroup, setCurrentGroup] = useState<number | null>(null);
@@ -44,8 +56,8 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
   // Chat state
-  const [showUserChat, setShowUserChat] = useState<boolean>(false);
-  const [showGroupChat, setShowGroupChat] = useState<boolean>(false);
+  const [showUserChat, setShowUserChat] = useState<boolean>(initialUserChatVisible);
+  const [showGroupChat, setShowGroupChat] = useState<boolean>(initialGroupChatVisible);
   const [chatWithUser, setChatWithUser] = useState<User | null>(null);
   const [groupChatData, setGroupChatData] = useState<Group | null>(null);
 
@@ -56,7 +68,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     x: Math.max(0, (window.innerWidth - 600) / 2), // 600px is the window width
     y: Math.max(0, window.innerHeight / 3)
   };
-  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable(initialPosition, true);
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('main-window', initialPosition, true);
 
   // Handle toggle functions
   const handleRestaurantPanelToggle = () => {
@@ -76,6 +88,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       const userData = await userService.getUserById(userId, token);
       setChatWithUser(userData);
       setShowUserChat(true);
+      sessionStorage.setItem('chat_user_id', userId.toString());
     } catch (error) {
       console.error('Failed to get user data:', error);
     }
@@ -84,6 +97,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const handleCloseUserChat = () => {
     setShowUserChat(false);
     setChatWithUser(null);
+    sessionStorage.removeItem('chat_user_id');
   };
 
   const handleStartGroupChat = async () => {
@@ -516,12 +530,57 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       sessionStorage.removeItem('username');
       sessionStorage.removeItem('isAdmin');
       sessionStorage.removeItem('groupId');
+      sessionStorage.removeItem('chat_user_id');
+      
+      // Clear all window positions
+      clearAllWindowPositions();
+      
+      // Clear all window visibility states
+      clearAllWindowVisibility();
       
       showStatusMessage('You have been logged out');
     } catch (error) {
       console.error('Logout failed:', error);
       showStatusMessage('Logout failed', 5000);
     }
+  };
+
+  // Function to clear all saved window positions
+  const clearAllWindowPositions = () => {
+    // Get all keys from sessionStorage
+    const keys = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith('window_position_')) {
+        keys.push(key);
+      }
+    }
+    
+    // Remove all window position entries
+    keys.forEach(key => {
+      sessionStorage.removeItem(key);
+    });
+    
+    console.log(`Cleared ${keys.length} saved window positions`);
+  };
+
+  // Function to clear all saved window visibility settings
+  const clearAllWindowVisibility = () => {
+    // Get all keys from sessionStorage
+    const keys = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith('window_visibility_')) {
+        keys.push(key);
+      }
+    }
+    
+    // Remove all window visibility entries
+    keys.forEach(key => {
+      sessionStorage.removeItem(key);
+    });
+    
+    console.log(`Cleared ${keys.length} saved window visibility states`);
   };
 
   // Voting functions using WebSocket
@@ -608,6 +667,65 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     }
   };
 
+  // Update sessionStorage when window visibility changes
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_login', showLoginDialog.toString());
+  }, [showLoginDialog]);
+  
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_restaurant', showRestaurantPanel.toString());
+  }, [showRestaurantPanel]);
+  
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_user', showUserPanel.toString());
+  }, [showUserPanel]);
+  
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_group', showGroupPanel.toString());
+  }, [showGroupPanel]);
+  
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_user_chat', showUserChat.toString());
+  }, [showUserChat]);
+  
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_group_chat', showGroupChat.toString());
+  }, [showGroupChat]);
+
+  // Restore user chat state if needed
+  useEffect(() => {
+    const savedChatUserId = sessionStorage.getItem('chat_user_id');
+    
+    if (initialUserChatVisible && savedChatUserId && isLoggedIn && token) {
+      // Only try to restore if we're logged in
+      handleStartUserChat(parseInt(savedChatUserId, 10));
+    }
+  }, [isLoggedIn, token, initialUserChatVisible]);
+  
+  // Restore group chat state if needed
+  useEffect(() => {
+    if (initialGroupChatVisible && currentGroup && isLoggedIn && token) {
+      // Only try to restore if we're logged in and have a current group
+      handleStartGroupChat();
+    }
+  }, [isLoggedIn, token, currentGroup, initialGroupChatVisible]);
+
+  // Function to close all open windows except the main window
+  const closeAllWindows = () => {
+    // Close all admin panels
+    setShowRestaurantPanel(false);
+    setShowUserPanel(false);
+    setShowGroupPanel(false);
+    
+    // Close all chat windows
+    setShowUserChat(false);
+    setShowGroupChat(false);
+    setChatWithUser(null);
+    setGroupChatData(null);
+    
+    showStatusMessage('All windows closed');
+  };
+
   return isVisible && isInitialized ? (
     <div className="main-window-container">
       <div
@@ -678,6 +796,19 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
                       </div>
                     </div>
                   )}
+                  
+                  <div className="menu-item">
+                    <button className="menu-button">Window</button>
+                    <div className="dropdown-content">
+                      <button onClick={closeAllWindows}>Close All Windows</button>
+                      <button onClick={clearAllWindowPositions}>Reset Window Positions</button>
+                      <button onClick={() => {
+                        clearAllWindowPositions();
+                        clearAllWindowVisibility();
+                        showStatusMessage('All window settings reset');
+                      }}>Reset All Windows</button>
+                    </div>
+                  </div>
                 </>
               )}
             </div>

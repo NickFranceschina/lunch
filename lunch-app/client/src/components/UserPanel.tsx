@@ -58,7 +58,14 @@ const UserPanel: React.FC<UserPanelProps> = ({
   const [showOnlyLoggedIn, setShowOnlyLoggedIn] = useState<boolean>(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
-  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
+  
+  // Use position in the center of the screen
+  const initialPosition = {
+    x: Math.max(0, (window.innerWidth - 700) / 2), // 700px is approximate panel width
+    y: Math.max(0, window.innerHeight / 6)
+  };
+  
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('user-panel', initialPosition, true);
 
   // Fetch users and set up WebSocket listener
   useEffect(() => {
@@ -86,13 +93,6 @@ const UserPanel: React.FC<UserPanelProps> = ({
       };
     }
   }, [isVisible, showOnlyLoggedIn]);
-
-  // Reset position when panel opens
-  useEffect(() => {
-    if (isVisible) {
-      resetPosition();
-    }
-  }, [isVisible, resetPosition]);
 
   // Fetch all users
   const fetchUsers = async () => {

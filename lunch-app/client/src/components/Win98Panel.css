@@ -8,8 +8,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 999;
-  pointer-events: none;
+  z-index: 1999;
+  pointer-events: auto;
 }
 
 .win98-panel {
@@ -26,7 +26,7 @@
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   pointer-events: auto;
-  z-index: 1000;
+  z-index: 2000;
 }
 
 .win98-panel-header {
@@ -39,6 +39,8 @@
   font-weight: bold;
   font-size: 12px;
   height: 18px;
+  position: relative;
+  z-index: 2001;
 }
 
 .win98-panel-title {
@@ -65,6 +67,8 @@
   font-size: 12px;
   padding: 0;
   margin: 0;
+  position: relative;
+  z-index: 2001;
 }
 
 .win98-panel-close:active {
@@ -79,6 +83,8 @@
   overflow-y: auto;
   padding: 10px;
   background-color: #c0c0c0;
+  position: relative;
+  z-index: 2000;
 }
 
 .win98-panel-footer {

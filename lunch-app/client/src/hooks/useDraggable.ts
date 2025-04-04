@@ -6,25 +6,67 @@ interface Position {
 }
 
 /**
- * Hook to make an element draggable by its header
+ * Hook to make an element draggable by its header and save its position
+ * @param windowId - Unique identifier for this window to save position in sessionStorage
  * @param initialPosition - Optional initial position
  * @param skipCentering - When true, use the exact initial position without centering
  * @returns Object with position, ref for the container, and ref for the drag handle
  */
-const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering: boolean = false) => {
+const useDraggable = (
+  windowId: string,
+  initialPosition: Position = { x: 0, y: 0 }, 
+  skipCentering: boolean = false
+) => {
+  // Try to get saved position from sessionStorage
+  const getSavedPosition = (): Position | null => {
+    try {
+      const savedPositionStr = sessionStorage.getItem(`window_position_${windowId}`);
+      if (savedPositionStr) {
+        return JSON.parse(savedPositionStr) as Position;
+      }
+    } catch (err) {
+      console.error(`Error loading position for window ${windowId}:`, err);
+    }
+    return null;
+  };
+
+  // Get saved position or use initial position
+  const savedPosition = getSavedPosition();
+  
   // Set the initial state directly for immediate positioning
-  const initialCenteredPosition = skipCentering ? initialPosition : { x: 0, y: 0 };
+  const initialCenteredPosition = savedPosition || (skipCentering ? initialPosition : { x: 0, y: 0 });
   const [position, setPosition] = useState<Position>(initialCenteredPosition);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef<Position>({ x: 0, y: 0 });
-  const positionedRef = useRef(false);
+  const positionedRef = useRef(savedPosition !== null);
 
-  // Set initial position on mount
+  // Save position to sessionStorage when it changes
+  const savePosition = useCallback((pos: Position) => {
+    try {
+      sessionStorage.setItem(`window_position_${windowId}`, JSON.stringify(pos));
+    } catch (err) {
+      console.error(`Error saving position for window ${windowId}:`, err);
+    }
+  }, [windowId]);
+
+  // Custom position setter that also saves to sessionStorage
+  const setPositionAndSave = useCallback((newPosition: Position | ((prev: Position) => Position)) => {
+    setPosition(prevPosition => {
+      const nextPosition = typeof newPosition === 'function' 
+        ? newPosition(prevPosition) 
+        : newPosition;
+      
+      savePosition(nextPosition);
+      return nextPosition;
+    });
+  }, [savePosition]);
+
+  // Set initial position on mount if not using saved position
   useEffect(() => {
-    // If skipCentering is true, we don't modify the position at all
-    if (skipCentering) {
+    // If we have a saved position or skipCentering is true, we don't need to center
+    if (savedPosition || skipCentering) {
       positionedRef.current = true;
       return;
     }
@@ -41,12 +83,10 @@ const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering:
       const newX = Math.max(0, (viewportWidth - rect.width) / 2);
       const newY = Math.max(0, (viewportHeight - rect.height) / 3); // Position it at 1/3 from the top
       
-      setPosition({
-        x: newX,
-        y: newY
-      });
+      const newPosition = { x: newX, y: newY };
+      setPositionAndSave(newPosition);
     }
-  }, [skipCentering]);
+  }, [skipCentering, savedPosition, setPositionAndSave]);
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
@@ -98,6 +138,10 @@ const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering:
     };
 
     const handleMouseUp = () => {
+      // Save position when dragging stops
+      if (isDragging) {
+        savePosition(position);
+      }
       setIsDragging(false);
     };
 
@@ -112,7 +156,7 @@ const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering:
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, position, savePosition]);
 
   // Memoize resetPosition to prevent recreation on each render
   const resetPosition = useCallback(() => {
@@ -121,12 +165,23 @@ const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering:
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       
-      setPosition({
+      const newPosition = {
         x: Math.max(0, (viewportWidth - rect.width) / 2),
         y: Math.max(0, (viewportHeight - rect.height) / 3) // Position it at 1/3 from the top
-      });
+      };
+      
+      setPositionAndSave(newPosition);
     }
-  }, []);
+  }, [setPositionAndSave]);
+
+  // Function to clear the saved position
+  const clearSavedPosition = useCallback(() => {
+    try {
+      sessionStorage.removeItem(`window_position_${windowId}`);
+    } catch (err) {
+      console.error(`Error clearing position for window ${windowId}:`, err);
+    }
+  }, [windowId]);
 
   return {
     position,
@@ -134,7 +189,8 @@ const useDraggable = (initialPosition: Position = { x: 0, y: 0 }, skipCentering:
     containerRef,
     dragHandleRef,
     resetPosition,
-    setPosition
+    setPosition: setPositionAndSave,
+    clearSavedPosition
   };
 };
 

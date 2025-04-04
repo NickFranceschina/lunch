@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import MainWindow from './components/MainWindow';
 import Win98Taskbar from './components/Win98Taskbar';
@@ -6,7 +6,14 @@ import { AuthProvider } from './services/AuthContext';
 import { WebSocketProvider } from './services/WebSocketContext';
 
 function App() {
-  const [isMainWindowVisible, setIsMainWindowVisible] = useState<boolean>(true);
+  // Read initial visibility state from sessionStorage, default to true if not found
+  const initialVisibility = sessionStorage.getItem('window_visibility_main') === 'false' ? false : true;
+  const [isMainWindowVisible, setIsMainWindowVisible] = useState<boolean>(initialVisibility);
+
+  // Save window visibility state to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('window_visibility_main', isMainWindowVisible.toString());
+  }, [isMainWindowVisible]);
 
   const toggleMainWindowVisibility = () => {
     setIsMainWindowVisible(!isMainWindowVisible);

@@ -38,7 +38,14 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
-  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
+  
+  // Use position in the center of the screen
+  const initialPosition = {
+    x: Math.max(0, (window.innerWidth - 700) / 2), // 700px is approximate panel width
+    y: Math.max(0, window.innerHeight / 6)
+  };
+  
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('restaurant-panel', initialPosition, true);
 
   // Fetch restaurants on component mount
   useEffect(() => {
@@ -46,13 +53,6 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       fetchRestaurants();
     }
   }, [isVisible]);
-
-  // Reset position when panel opens
-  useEffect(() => {
-    if (isVisible) {
-      resetPosition();
-    }
-  }, [isVisible, resetPosition]);
 
   // Fetch all restaurants
   const fetchRestaurants = async () => {

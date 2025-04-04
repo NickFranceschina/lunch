@@ -12,7 +12,14 @@ interface LoginDialogProps {
 const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
+  
+  // Use initial position in the center of the screen
+  const initialPosition = {
+    x: Math.max(0, (window.innerWidth - 320) / 2), // 320px is dialog width
+    y: Math.max(0, window.innerHeight / 3)
+  };
+  
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('login-dialog', initialPosition, true);
 
   // Handle Escape key to cancel
   useEffect(() => {
@@ -31,14 +38,13 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
     };
   }, [isVisible, onCancel]);
 
-  // Reset form and position when dialog becomes visible
+  // Reset form when dialog becomes visible
   useEffect(() => {
     if (isVisible) {
       setUsername('');
       setPassword('');
-      resetPosition();
     }
-  }, [isVisible]); // Remove resetPosition from dependency array since it's now memoized
+  }, [isVisible]);
 
   if (!isVisible) return null;
 

@@ -61,7 +61,14 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'details' | 'members'>('details');
   const [hasChanges, setHasChanges] = useState<boolean>(false);
-  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
+  
+  // Use position in the center of the screen
+  const initialPosition = {
+    x: Math.max(0, (window.innerWidth - 700) / 2), // 700px is approximate panel width
+    y: Math.max(0, window.innerHeight / 6)
+  };
+  
+  const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('group-panel', initialPosition, true);
 
   // Fetch groups on component mount
   useEffect(() => {
@@ -70,9 +77,8 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       if (isAdmin) {
         fetchAllUsers();
       }
-      resetPosition();
     }
-  }, [isVisible, isAdmin, resetPosition]);
+  }, [isVisible, isAdmin]);
 
   // Select current group initially
   useEffect(() => {
