@@ -222,6 +222,19 @@ class WebSocketService {
   }
 
   /**
+   * Send a notification to a group or all users
+   * @param message The notification message
+   * @param groupId Optional group ID (if not provided, sends to all users)
+   */
+  sendNotification(message: string, groupId?: number): void {
+    this.sendMessage('notification', { 
+      message,
+      groupId, 
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * Send a chat message to a user or group
    * @param message Message text
    * @param targetId User ID or group ID

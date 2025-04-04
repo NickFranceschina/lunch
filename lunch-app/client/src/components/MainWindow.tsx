@@ -6,6 +6,7 @@ import LoginDialog from './LoginDialog';
 import RestaurantPanel from './RestaurantPanel';
 import UserPanel from './UserPanel';
 import GroupPanel from './GroupPanel';
+import StatusBar from './StatusBar';
 import { authService, restaurantService } from '../services/api';
 import { websocketService } from '../services/websocket.service';
 import './MainWindow.css';
@@ -24,6 +25,22 @@ const MainWindow: React.FC = () => {
   const [token, setToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [showStatus, setShowStatus] = useState<boolean>(false);
+
+  // Show status message with auto-hide after delay
+  const showStatusMessage = (message: string, duration: number = 3000) => {
+    setStatusMessage(message);
+    setShowStatus(true);
+    
+    // Auto-hide after duration (return to "Ready" state)
+    const timer = setTimeout(() => {
+      setShowStatus(false);
+      setStatusMessage('');  // Clear the message when hiding
+    }, duration);
+    
+    return () => clearTimeout(timer);
+  };
 
   // Set up WebSocket event listeners
   const setupWebSocketListeners = useCallback(() => {
@@ -41,7 +58,7 @@ const MainWindow: React.FC = () => {
 
     // Listen for notifications
     const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
-      alert(data.message);
+      showStatusMessage(data.message, 5000);
     });
 
     // Return cleanup function
@@ -61,6 +78,7 @@ const MainWindow: React.FC = () => {
         .then(() => {
           setWsConnected(true);
           console.log('WebSocket connected successfully');
+          showStatusMessage('Connected to server');
           
           // Send periodic pings to keep connection alive
           const pingInterval = setInterval(() => {
@@ -78,6 +96,7 @@ const MainWindow: React.FC = () => {
         .catch(error => {
           console.error('WebSocket connection failed:', error);
           setWsConnected(false);
+          showStatusMessage('Failed to connect to server', 5000);
         });
       
       // Set up listeners
@@ -120,9 +139,10 @@ const MainWindow: React.FC = () => {
       localStorage.setItem('token', response.token);
       
       setShowLoginDialog(false);
+      showStatusMessage(`Welcome, ${username}!`);
     } catch (error) {
       console.error('Login failed:', error);
-      alert('Login failed. Please check your credentials.');
+      showStatusMessage('Login failed. Please check your credentials.', 5000);
     }
   };
 
@@ -150,8 +170,10 @@ const MainWindow: React.FC = () => {
       
       // Remove token from localStorage
       localStorage.removeItem('token');
+      showStatusMessage('You have been logged out');
     } catch (error) {
       console.error('Logout failed:', error);
+      showStatusMessage('Logout failed', 5000);
     }
   };
 
@@ -162,15 +184,16 @@ const MainWindow: React.FC = () => {
     if (wsConnected) {
       // Send vote through WebSocket
       websocketService.sendVote(true);
+      showStatusMessage('Your vote was cast');
     } else {
       // Fallback to REST API
       try {
         const response = await restaurantService.voteYes(currentGroup, token);
         setConfirmed(response.isConfirmed);
-        alert('Vote was cast');
+        showStatusMessage('Your vote was cast');
       } catch (error) {
         console.error('Failed to vote yes:', error);
-        alert('Failed to vote yes');
+        showStatusMessage('Failed to vote yes', 5000);
       }
     }
   };
@@ -181,15 +204,16 @@ const MainWindow: React.FC = () => {
     if (wsConnected) {
       // Send vote through WebSocket
       websocketService.sendVote(false);
+      showStatusMessage('Your vote was cast');
     } else {
       // Fallback to REST API
       try {
         const response = await restaurantService.voteNo(currentGroup, token);
         setConfirmed(response.isConfirmed);
-        alert('Vote was cast');
+        showStatusMessage('Your vote was cast');
       } catch (error) {
         console.error('Failed to vote no:', error);
-        alert('Failed to vote no');
+        showStatusMessage('Failed to vote no', 5000);
       }
     }
   };
@@ -200,15 +224,17 @@ const MainWindow: React.FC = () => {
     if (wsConnected) {
       // Send new random request through WebSocket
       websocketService.sendNewRandom(currentGroup);
+      showStatusMessage('Selecting a new random restaurant...');
     } else {
       // Fallback to REST API
       try {
         const response = await restaurantService.getRandomRestaurant(currentGroup, token);
         setRestaurantName(response.restaurant.name);
         setConfirmed(false);
+        showStatusMessage(`New restaurant selected: ${response.restaurant.name}`);
       } catch (error) {
         console.error('Failed to get random restaurant:', error);
-        alert('Failed to get random restaurant');
+        showStatusMessage('Failed to get random restaurant', 5000);
       }
     }
   };
@@ -227,44 +253,54 @@ const MainWindow: React.FC = () => {
   };
 
   return (
-    <div className="main-window">
-      <div className="top-bar">
-        <div className="menu-bar">
-          <div className="menu-item">
-            <span>Start</span>
-            <div className="dropdown-content">
-              {!isLoggedIn ? (
-                <div className="dropdown-item" onClick={handleLoginClick}>Login</div>
-              ) : (
-                <div className="dropdown-item" onClick={handleLogout}>Logout</div>
-              )}
-            </div>
-          </div>
-          {isLoggedIn && isAdmin && (
+    <div className="win98-container">
+      <div className="win98-titlebar">
+        <div className="titlebar-text">Lunch App</div>
+      </div>
+      <div className="main-window">
+        <div className="top-bar">
+          <div className="menu-bar">
             <div className="menu-item">
-              <span>Administer</span>
+              <span>Start</span>
               <div className="dropdown-content">
-                <div className="dropdown-item" onClick={handleUserPanelToggle}>User Info</div>
-                <div className="dropdown-item" onClick={handleGroupPanelToggle}>Group Info</div>
-                <div className="dropdown-item" onClick={handleRestaurantPanelToggle}>Restaurants</div>
+                {!isLoggedIn ? (
+                  <div className="dropdown-item" onClick={handleLoginClick}>Login</div>
+                ) : (
+                  <div className="dropdown-item" onClick={handleLogout}>Logout</div>
+                )}
               </div>
             </div>
-          )}
-          <div className="menu-item">
-            <span>About</span>
+            {isLoggedIn && isAdmin && (
+              <div className="menu-item">
+                <span>Administer</span>
+                <div className="dropdown-content">
+                  <div className="dropdown-item" onClick={handleUserPanelToggle}>User Info</div>
+                  <div className="dropdown-item" onClick={handleGroupPanelToggle}>Group Info</div>
+                  <div className="dropdown-item" onClick={handleRestaurantPanelToggle}>Restaurants</div>
+                </div>
+              </div>
+            )}
+            <div className="menu-item">
+              <span>About</span>
+            </div>
           </div>
+          <LEDIndicator confirmed={confirmed} />
+          {wsConnected && <div className="ws-indicator">🔄</div>}
         </div>
-        <LEDIndicator confirmed={confirmed} />
-        {wsConnected && <div className="ws-indicator">🔄</div>}
-      </div>
 
-      <RestaurantDisplay restaurantName={restaurantName} />
+        <RestaurantDisplay restaurantName={restaurantName} />
+        
+        <VotingControls
+          enabled={isLoggedIn}
+          onVoteYes={handleVoteYes}
+          onVoteNo={handleVoteNo}
+          onNewRandom={handleNewRandom}
+        />
+      </div>
       
-      <VotingControls
-        enabled={isLoggedIn}
-        onVoteYes={handleVoteYes}
-        onVoteNo={handleVoteNo}
-        onNewRandom={handleNewRandom}
+      <StatusBar 
+        message={statusMessage} 
+        isVisible={showStatus}
       />
       
       <LoginDialog 

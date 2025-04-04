@@ -19,6 +19,19 @@ The modernization effort aims to:
 3. Improve security and maintainability
 4. Add modern features while keeping the core functionality intact
 
+## Current Status
+
+The modernization is well underway with the following features implemented:
+- Complete Windows 98-style UI with titlebar and status bar
+- Real-time WebSocket communication for:
+  - Restaurant selection broadcasting to group members
+  - Live vote tracking and confirmation
+  - User presence and status indicators
+  - Notifications in the status bar
+- Full group management with user addition/removal functionality
+- Administrator functionality for user and restaurant management
+- Secure JWT-based authentication and WebSocket connections
+
 ## Repository Structure
 
 - `modernization-plan.md` - Detailed plan for the modernization effort
@@ -68,7 +81,17 @@ npm start
    - The client runs on port 3000
    - Access the application at http://localhost:3000
 
-5. Contribute to the modernization effort by implementing the planned components
+5. Feature Highlights:
+   - Windows 98-style UI with authentic look and feel
+   - Real-time group collaboration for restaurant selection
+   - User presence tracking for administrators
+   - Status bar replacing alert() dialogs for notifications
+   - Role-based access control for admin functionality
+
+6. Next Steps:
+   - Chat functionality implementation (coming soon)
+   - Testing infrastructure
+   - Deployment configuration
 
 ## Contributing
 

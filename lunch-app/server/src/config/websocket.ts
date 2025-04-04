@@ -234,6 +234,21 @@ class WebSocketServer {
         }
         break;
         
+      case 'notification':
+        // Handle notification message from a client
+        if (message.data && message.data.message) {
+          if (message.data.groupId) {
+            // Send to specific group
+            this.sendGroupNotification(message.data.groupId, message.data.message);
+          } else {
+            // Send to all users if client is admin
+            if (client.isAdmin) {
+              this.sendGlobalNotification(message.data.message);
+            }
+          }
+        }
+        break;
+        
       default:
         console.log(`Unhandled message type: ${message.type}`);
     }
@@ -294,6 +309,19 @@ class WebSocketServer {
    */
   sendGroupNotification(groupId: number, message: string) {
     this.broadcastToGroup(groupId, {
+      type: 'notification',
+      data: {
+        message,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  /**
+   * Send a notification to all users
+   */
+  sendGlobalNotification(message: string) {
+    this.broadcastAll({
       type: 'notification',
       data: {
         message,
