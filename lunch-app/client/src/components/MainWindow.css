@@ -246,13 +246,23 @@
 .vote-counts {
   display: flex;
   justify-content: center;
-  background-color: #000000;
   color: #ffffff;
-  padding: 8px;
-  margin: 10px 0;
-  text-align: center;
-  font-family: "MS Sans Serif", Arial, sans-serif;
   font-size: 14px;
+  padding: 2px 0;
+  margin: 0;
+  align-items: center;
+}
+
+.vote-icon {
+  display: flex;
+  align-items: center;
+  padding: 2px 5px;
+}
+
+.vote-separator {
+  margin: 0 6px;
+  color: #888888;
+  font-weight: bold;
 }
 
 .header-row {

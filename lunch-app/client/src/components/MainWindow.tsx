@@ -35,6 +35,7 @@ const MainWindow: React.FC = () => {
   const [yesVotes, setYesVotes] = useState<number>(0);
   const [noVotes, setNoVotes] = useState<number>(0);
   const [hasVoted, setHasVoted] = useState<boolean>(false);
+  const [totalUsers, setTotalUsers] = useState(0);
   
   // Chat state
   const [showUserChat, setShowUserChat] = useState<boolean>(false);
@@ -173,7 +174,8 @@ const MainWindow: React.FC = () => {
                   restaurant: { name: string },
                   isConfirmed: boolean,
                   yesVotes: number,
-                  noVotes: number
+                  noVotes: number,
+                  activeUsers: number
                 }) => {
                   if (response.restaurant) {
                     console.log('Current restaurant selection:', response.restaurant);
@@ -181,6 +183,12 @@ const MainWindow: React.FC = () => {
                     setConfirmed(response.isConfirmed);
                     setYesVotes(response.yesVotes || 0);
                     setNoVotes(response.noVotes || 0);
+                    
+                    // Set total users with fallback to a reasonable number 
+                    // (at least 3 users in a group or the sum of current votes)
+                    const minUserCount = Math.max(3, (response.yesVotes || 0) + (response.noVotes || 0));
+                    setTotalUsers(response.activeUsers || minUserCount);
+                    
                     // Don't set hasVoted to true here, so the new user can still vote
                   }
                 })
@@ -188,6 +196,12 @@ const MainWindow: React.FC = () => {
                   console.error('Failed to fetch current restaurant:', error);
                   // Non-critical error, don't show to user
                 });
+              
+              // We can't fetch users in group directly, so we use a fallback approach
+              // Assume at least 3 people in the group as a fallback
+              if (!totalUsers) {
+                setTotalUsers(3);
+              }
             } catch (error) {
               console.error('Error requesting current restaurant:', error);
             }
@@ -195,24 +209,71 @@ const MainWindow: React.FC = () => {
           
           // Add event listeners after successful connection
           const selectionUnsubscribe = websocketService.addMessageListener('restaurant_selection', (data: any) => {
+            console.log('MainWindow - Restaurant selection - RAW DATA:', data);
+            
+            // 1. Update restaurant name
             setRestaurantName(data.restaurantName);
+            
+            // 2. Update confirmation status
             setConfirmed(data.confirmed);
-            setYesVotes(0);
-            setNoVotes(0);
+            
+            // 3. Reset vote state
+            // If restaurant is confirmed, we know there must be at least 2 yes votes
+            if (data.confirmed) {
+              setYesVotes(data.yesVotes !== undefined ? data.yesVotes : 2);
+            } else {
+              setYesVotes(data.yesVotes !== undefined ? data.yesVotes : 0);
+            }
+            
+            // Always use server's no votes or reset to 0
+            setNoVotes(data.noVotes !== undefined ? data.noVotes : 0);
+            
+            // 4. Reset voting state
             setHasVoted(false);
+            
+            // 5. Set total users count (with fallback)
+            setTotalUsers(data.activeUsers || 3);
           });
           
           const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
-            console.log('MainWindow - Vote update:', data);
+            console.log('MainWindow - Vote update - RAW DATA:', data);
+            
+            // =====================================================
+            // SIMPLE FIX: Prioritize confirmed status over vote counts
+            // =====================================================
+            
+            // 1. Check if this is a confirmation event
+            const isConfirmationEvent = data.isConfirmed === true && !confirmed;
+            
+            // 2. Update confirmation status
+            if (data.isConfirmed !== undefined) {
+              setConfirmed(data.isConfirmed);
+              
+              // 3. If we're becoming confirmed, ensure we have at least 2 yes votes
+              // This is because confirmation requires at least 2 yes votes
+              if (isConfirmationEvent) {
+                console.log('CONFIRMATION EVENT - Setting yes votes to at least 2');
+                setYesVotes(Math.max(2, yesVotes));
+                setStatusMessage(''); // Reset status message
+                return; // Skip the rest of the handler for confirmation events
+              }
+            }
+            
+            // 4. For normal vote updates, use the server's values
             if (data.yesVotes !== undefined) {
               setYesVotes(data.yesVotes);
             }
+            
             if (data.noVotes !== undefined) {
               setNoVotes(data.noVotes);
             }
-            if (data.isConfirmed !== undefined) {
-              setConfirmed(data.isConfirmed);
+            
+            // 5. Update active users count
+            if (data.activeUsers !== undefined) {
+              setTotalUsers(data.activeUsers);
             }
+            
+            // 6. Mark current user as having voted if this update is about their vote
             if (data.userId === currentUserId) {
               setHasVoted(true);
             }
@@ -451,6 +512,10 @@ const MainWindow: React.FC = () => {
       websocketService.sendVote(true);
       showStatusMessage('Your vote was cast');
       setHasVoted(true);
+      
+      // Immediately increment local yes count for UI responsiveness
+      // The actual count will be updated when server responds
+      setYesVotes(prevYesVotes => prevYesVotes + 1);
     } else {
       // Fallback to REST API
       try {
@@ -475,6 +540,10 @@ const MainWindow: React.FC = () => {
       websocketService.sendVote(false);
       showStatusMessage('Your vote was cast');
       setHasVoted(true);
+      
+      // Immediately increment local no count for UI responsiveness
+      // The actual count will be updated when server responds
+      setNoVotes(prevNoVotes => prevNoVotes + 1);
     } else {
       // Fallback to REST API
       try {
@@ -598,15 +667,17 @@ const MainWindow: React.FC = () => {
                   />
                 </div>
                 
-                <RestaurantDisplay restaurantName={restaurantName} />
-                
-                {currentGroup && (
-                  <div className="vote-counts">
-                    <span>Yes Votes: {yesVotes}</span>
-                    <span> | </span>
-                    <span>No Votes: {noVotes}</span>
-                  </div>
-                )}
+                <RestaurantDisplay restaurantName={restaurantName}>
+                  {currentGroup && (
+                    <div className="vote-counts">
+                      <span className="vote-icon">👍 {yesVotes}</span>
+                      <span className="vote-separator">|</span>
+                      <span className="vote-icon">👎 {noVotes}</span>
+                      <span className="vote-separator">|</span>
+                      <span className="vote-icon">⏳ {confirmed ? 0 : totalUsers - yesVotes - noVotes}</span>
+                    </div>
+                  )}
+                </RestaurantDisplay>
                 
                 <VotingControls 
                   onVoteYes={handleVoteYes} 
@@ -628,7 +699,8 @@ const MainWindow: React.FC = () => {
           message={
             isLoggedIn && statusMessage === '' ? 
             (confirmed ? 'Status: Confirmed' : 
-            (yesVotes + noVotes === 0 ? 'Waiting for votes' : 'Voting in progress')) 
+             (yesVotes + noVotes === 0 ? 'Waiting for votes' : 
+              (totalUsers <= yesVotes + noVotes ? 'All votes received' : 'Voting in progress'))) 
             : statusMessage
           } 
           isVisible={showStatus || isLoggedIn}

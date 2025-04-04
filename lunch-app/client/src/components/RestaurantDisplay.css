@@ -7,16 +7,31 @@
 
 .restaurant-name {
   font-family: 'Comic Sans MS', cursive;
-  font-size: 36px;
   color: #FFFFFF;
   border: 1px solid #FFFFFF;
   padding: 8px;
-  height: 100px;
+  min-height: 100px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: space-between;
   text-align: center;
   word-wrap: break-word;
   overflow: hidden;
   background-color: #000000;
+}
+
+.restaurant-text {
+  font-size: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  padding: 8px 0;
+}
+
+.restaurant-footer {
+  margin-top: 4px;
+  padding-top: 4px;
+  font-family: "MS Sans Serif", Arial, sans-serif;
+  font-size: 14px;
 } 
