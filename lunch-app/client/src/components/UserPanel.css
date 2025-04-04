@@ -159,6 +159,12 @@
   color: #000080;
 }
 
+.win98-list-item.selected.logged-in {
+  background-color: #000080;
+  color: #ffffff;
+  font-weight: bold;
+}
+
 .win98-button-row {
   display: flex;
   justify-content: center;

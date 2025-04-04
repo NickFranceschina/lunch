@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { websocketService } from '../services/websocket.service';
+import { groupService } from '../services/api';
 import './UserPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
@@ -13,6 +14,12 @@ interface User {
   port?: number;
   currentGroupId?: number;
   groups?: { id: number, name: string }[];
+}
+
+interface Group {
+  id: number;
+  name: string;
+  users?: User[];
 }
 
 interface UserPanelProps {
@@ -33,26 +40,31 @@ const UserPanel: React.FC<UserPanelProps> = ({
   onStartChat
 }) => {
   const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     username: string;
     password: string;
     isAdmin: boolean;
+    currentGroupId?: number | null;
   }>({
     username: '',
     password: '',
-    isAdmin: false
+    isAdmin: false,
+    currentGroupId: null
   });
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [showOnlyLoggedIn, setShowOnlyLoggedIn] = useState<boolean>(true);
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [showOnlyLoggedIn, setShowOnlyLoggedIn] = useState<boolean>(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
   const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
 
-  // Fetch users on component mount and set up WebSocket listener
+  // Fetch users and set up WebSocket listener
   useEffect(() => {
     if (isVisible) {
       fetchUsers();
+      fetchGroups();
       
       // Set up WebSocket listener for user presence updates
       const unsubscribe = websocketService.addMessageListener('user_presence_update', (data: any) => {
@@ -86,7 +98,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/users', {
+      const response = await fetch('http://localhost:3001/api/users?includeGroups=true', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -117,65 +129,175 @@ const UserPanel: React.FC<UserPanelProps> = ({
     }
   };
 
-  // Handle form input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    });
+  // Fetch all groups
+  const fetchGroups = async () => {
+    try {
+      const response = await groupService.getAllGroups(token);
+      setGroups(response.data);
+    } catch (err) {
+      console.error('Error fetching groups:', err);
+    }
   };
 
-  // Handle form submission for new/updated user
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    // Handle checkbox separately
+    if (type === 'checkbox') {
+      const checkbox = e.target as HTMLInputElement;
+      const newFormData = {
+        ...formData,
+        [name]: checkbox.checked
+      };
+      setFormData(newFormData);
+      checkForChanges(newFormData);
+      return;
+    }
+    
+    // Handle other inputs
+    const newFormData = {
+      ...formData,
+      [name]: name === 'currentGroupId' ? (value ? parseInt(value) : null) : value
+    };
+    setFormData(newFormData);
+    checkForChanges(newFormData);
+  };
+
+  // Check if form data has changed from the original user data
+  const checkForChanges = (newFormData: typeof formData) => {
+    if (!selectedUserId || showAddForm) return;
+    
+    const selectedUser = users.find(u => u.id === selectedUserId);
+    if (!selectedUser) return;
+
+    const hasPasswordChange = newFormData.password.trim() !== '';
+    const hasUsernameChange = newFormData.username !== selectedUser.username;
+    const hasAdminChange = newFormData.isAdmin !== selectedUser.isAdmin;
+    const hasGroupChange = newFormData.currentGroupId !== selectedUser.currentGroupId;
+
+    setHasChanges(hasPasswordChange || hasUsernameChange || hasAdminChange || hasGroupChange);
+  };
+
+  // Handle changing user's group
+  const handleChangeGroup = async (userId: number, groupId: number | null) => {
+    try {
+      setLoading(true);
+      
+      if (groupId === null) {
+        // Remove user from current group
+        const user = users.find(u => u.id === userId);
+        if (user && user.groups && user.groups.length > 0) {
+          await groupService.removeUserFromGroup(user.groups[0].id, userId, token);
+        }
+      } else {
+        // Add user to new group (this will automatically remove them from any existing group)
+        await groupService.addUserToGroup(groupId, userId, token);
+      }
+      
+      // Refresh user data
+      await fetchUsers();
+      
+      setError(null);
+    } catch (err) {
+      setError('Error changing user group. Please try again.');
+      console.error('Error changing user group:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle form submission for new user
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       setLoading(true);
       
-      const url = editingId 
-        ? `http://localhost:3001/api/users/${editingId}`
-        : 'http://localhost:3001/api/auth/register';
-
-      const method = editingId ? 'PUT' : 'POST';
+      // Prepare data for submission, excluding currentGroupId
+      const { currentGroupId, ...userData } = formData;
       
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('http://localhost:3001/api/auth/register', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(userData)
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${editingId ? 'update' : 'create'} user`);
+        throw new Error('Failed to create user');
+      }
+
+      const result = await response.json();
+      
+      // If a group was selected, add the user to the group
+      if (currentGroupId) {
+        await handleChangeGroup(result.data.id, currentGroupId);
       }
 
       // Reset form and reload users
       setFormData({
         username: '',
         password: '',
-        isAdmin: false
+        isAdmin: false,
+        currentGroupId: null
       });
-      setEditingId(null);
+      setShowAddForm(false);
       await fetchUsers();
     } catch (err) {
-      setError(`Error ${editingId ? 'updating' : 'creating'} user. Please try again.`);
-      console.error(`Error ${editingId ? 'updating' : 'creating'} user:`, err);
+      setError('Error creating user. Please try again.');
+      console.error('Error creating user:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Edit a user
-  const handleEdit = (user: User) => {
-    setFormData({
-      username: user.username,
-      password: '', // Password field is cleared for security
-      isAdmin: user.isAdmin
-    });
-    setEditingId(user.id);
+  // Handle updating a user
+  const handleUpdateUser = async () => {
+    if (!selectedUserId) return;
+    
+    try {
+      setLoading(true);
+      
+      // Prepare data for submission, excluding currentGroupId
+      const { currentGroupId, password, ...userData } = formData;
+      
+      // Only include password if it was provided
+      const dataToSend = password ? { ...userData, password } : userData;
+      
+      const response = await fetch(`http://localhost:3001/api/users/${selectedUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(dataToSend)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user');
+      }
+
+      // If group changed, update the user's group
+      const selectedUser = users.find(u => u.id === selectedUserId);
+      const currentGroupIdValue = selectedUser?.currentGroupId || null;
+      
+      if (currentGroupId !== undefined && currentGroupId !== currentGroupIdValue) {
+        await handleChangeGroup(selectedUserId, currentGroupId);
+      }
+
+      // Refresh data and exit edit mode
+      await fetchUsers();
+      setHasChanges(false);
+      setError(null);
+    } catch (err) {
+      setError('Error updating user. Please try again.');
+      console.error('Error updating user:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Delete a user
@@ -198,6 +320,9 @@ const UserPanel: React.FC<UserPanelProps> = ({
       }
 
       await fetchUsers();
+      if (id === selectedUserId) {
+        setSelectedUserId(users.length > 0 ? users[0].id : null);
+      }
     } catch (err) {
       setError('Error deleting user. Please try again.');
       console.error('Error deleting user:', err);
@@ -208,6 +333,14 @@ const UserPanel: React.FC<UserPanelProps> = ({
 
   const handleUserSelect = (user: User) => {
     setSelectedUserId(user.id);
+    setFormData({
+      username: user.username,
+      password: '', // Password field is cleared for security
+      isAdmin: user.isAdmin,
+      currentGroupId: user.currentGroupId || null
+    });
+    setHasChanges(false);
+    setShowAddForm(false);
   };
 
   // Toggle showing only logged in users
@@ -227,14 +360,70 @@ const UserPanel: React.FC<UserPanelProps> = ({
     }
   };
 
-  // Cancel edit mode
-  const handleCancelEdit = () => {
-    setEditingId(null);
+  // Handle add new user button click
+  const handleAddNewClick = () => {
     setFormData({
       username: '',
       password: '',
-      isAdmin: false
+      isAdmin: false,
+      currentGroupId: null
     });
+    setShowAddForm(true);
+    setSelectedUserId(null);
+  };
+
+  // Cancel actions
+  const handleCancel = () => {
+    if (showAddForm) {
+      setShowAddForm(false);
+      // Reselect a user if available
+      if (users.length > 0) {
+        setSelectedUserId(users[0].id);
+        const user = users[0];
+        setFormData({
+          username: user.username,
+          password: '',
+          isAdmin: user.isAdmin,
+          currentGroupId: user.currentGroupId || null
+        });
+        setHasChanges(false);
+      }
+    } else if (selectedUserId) {
+      // Reset form to selected user data
+      const user = users.find(u => u.id === selectedUserId);
+      if (user) {
+        setFormData({
+          username: user.username,
+          password: '',
+          isAdmin: user.isAdmin,
+          currentGroupId: user.currentGroupId || null
+        });
+        setHasChanges(false);
+      }
+    }
+  };
+
+  // Handle group change in user details section
+  const handleGroupChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!selectedUserId) return;
+    
+    const groupId = e.target.value ? parseInt(e.target.value) : null;
+    
+    try {
+      await handleChangeGroup(selectedUserId, groupId);
+      // Refresh the form data after group change
+      const updatedUser = users.find(u => u.id === selectedUserId);
+      if (updatedUser) {
+        setFormData({
+          ...formData,
+          currentGroupId: updatedUser.currentGroupId || null
+        });
+        setHasChanges(false);
+      }
+    } catch (err) {
+      setError('Failed to change user group');
+      console.error('Error changing user group:', err);
+    }
   };
 
   if (!isVisible) return null;
@@ -267,18 +456,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
           
           <div className="win98-split-panel">
             <div className="win98-panel-left">
-              <div className="win98-view-options">
-                <label className="win98-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyLoggedIn}
-                    onChange={handleToggleShowOnlyLoggedIn}
-                    className="win98-checkbox"
-                  />
-                  Show only logged in users
-                </label>
-              </div>
-              
+              <div className="win98-section-title">Users</div>
               <div className="win98-list user-list">
                 {loading ? (
                   <div className="loading-message">Loading users...</div>
@@ -297,142 +475,223 @@ const UserPanel: React.FC<UserPanelProps> = ({
                 )}
               </div>
               
-              {/* User action buttons */}
-              <div className="win98-button-row">
-                {onStartChat && selectedUserId && selectedUserId !== currentUserId && (
-                  <button 
-                    className="win98-button"
-                    onClick={handleChatWithUser}
-                    disabled={!selectedUser?.isLoggedIn}
-                    title={!selectedUser?.isLoggedIn ? "User is not logged in" : ""}
-                  >
-                    Chat with User
-                  </button>
-                )}
+              <div className="win98-view-options" style={{ marginBottom: '10px' }}>
+                <label className="win98-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyLoggedIn}
+                    onChange={handleToggleShowOnlyLoggedIn}
+                    className="win98-checkbox"
+                  />
+                  Show only logged in users
+                </label>
               </div>
+              
+              {isAdmin && (
+                <button 
+                  className="win98-button"
+                  onClick={handleAddNewClick}
+                  disabled={loading}
+                >
+                  Add New User
+                </button>
+              )}
             </div>
             
             <div className="win98-panel-right">
-              <div className="user-details">
-                <h3 className="win98-section-title">User Details</h3>
-                {selectedUser ? (
-                  <div className="user-details-content">
-                    <div className="win98-form-row">
-                      <label className="win98-label">Username:</label>
-                      <div className="win98-value">{selectedUser.username}</div>
-                    </div>
-                    <div className="win98-form-row">
-                      <label className="win98-label">Role:</label>
-                      <div className="win98-value">{selectedUser.isAdmin ? 'Administrator' : 'User'}</div>
-                    </div>
-                    <div className="win98-form-row">
-                      <label className="win98-label">Status:</label>
-                      <div className="win98-value">
-                        <span className={`status-indicator ${selectedUser.isLoggedIn ? 'online' : 'offline'}`}></span>
-                        {selectedUser.isLoggedIn ? 'Online' : 'Offline'}
-                      </div>
-                    </div>
-                    {selectedUser.groups && selectedUser.groups.length > 0 && (
+              {showAddForm ? (
+                <div className="win98-panel-section">
+                  <div className="win98-section-title">Add New User</div>
+                  <form onSubmit={handleSubmit}>
+                    <div className="win98-fieldset">
                       <div className="win98-form-row">
-                        <label className="win98-label">Group:</label>
-                        <div className="win98-value">{selectedUser.groups[0]?.name || 'None'}</div>
+                        <label className="win98-label" htmlFor="username">Username:</label>
+                        <input
+                          type="text"
+                          id="username"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleInputChange}
+                          className="win98-input"
+                          required
+                        />
                       </div>
-                    )}
-                    
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="password">Password:</label>
+                        <input
+                          type="password"
+                          id="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          className="win98-input"
+                          required
+                        />
+                      </div>
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="isAdmin">Admin:</label>
+                        <input
+                          type="checkbox"
+                          id="isAdmin"
+                          name="isAdmin"
+                          checked={formData.isAdmin}
+                          onChange={handleInputChange}
+                          className="win98-checkbox"
+                        />
+                      </div>
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="currentGroupId">Group:</label>
+                        <select 
+                          id="currentGroupId"
+                          name="currentGroupId"
+                          value={formData.currentGroupId || ''}
+                          onChange={handleInputChange}
+                          className="win98-select"
+                          style={{ width: 'auto', minWidth: '180px' }}
+                        >
+                          <option value="">No Group</option>
+                          {groups.map(group => (
+                            <option key={group.id} value={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="win98-panel-footer">
+                      <button
+                        type="button"
+                        onClick={handleCancel}
+                        className="win98-button"
+                        disabled={loading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="win98-button primary"
+                        disabled={loading || !formData.username || !formData.password}
+                      >
+                        Add User
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : selectedUser ? (
+                <div className="win98-panel-section">
+                  <div className="win98-section-title">User Details</div>
+                  
+                  <div>
+                    <div className="win98-fieldset">
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="username">Username:</label>
+                        <input
+                          type="text"
+                          id="username"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleInputChange}
+                          className="win98-input"
+                          required
+                          disabled={selectedUser.id === currentUserId}
+                        />
+                      </div>
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="password">New Password:</label>
+                        <input
+                          type="password"
+                          id="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          className="win98-input"
+                          placeholder="Leave blank to keep current"
+                          disabled={selectedUser.id === currentUserId}
+                        />
+                      </div>
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="isAdmin">Admin:</label>
+                        <input
+                          type="checkbox"
+                          id="isAdmin"
+                          name="isAdmin"
+                          checked={formData.isAdmin}
+                          onChange={handleInputChange}
+                          className="win98-checkbox"
+                          disabled={selectedUser.id === currentUserId}
+                        />
+                      </div>
+                      <div className="win98-form-row">
+                        <label className="win98-label" htmlFor="currentGroupId">Group:</label>
+                        <select 
+                          id="currentGroupId"
+                          name="currentGroupId"
+                          value={formData.currentGroupId || ''}
+                          onChange={handleInputChange}
+                          className="win98-select"
+                          style={{ width: 'auto', minWidth: '180px' }}
+                          disabled={selectedUser.id === currentUserId}
+                        >
+                          <option value="">No Group</option>
+                          {groups.map(group => (
+                            <option key={group.id} value={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="win98-form-row">
+                        <span className="win98-label">Status:</span>
+                        <span>
+                          <span className={`status-indicator ${selectedUser.isLoggedIn ? 'online' : 'offline'}`}></span>
+                          {selectedUser.isLoggedIn ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </div>
+                  
                     {isAdmin && selectedUser.id !== currentUserId && (
-                      <div className="user-actions">
-                        <button 
-                          className="win98-button small"
-                          onClick={() => handleEdit(selectedUser)}
-                          disabled={loading}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          className="win98-button small danger"
-                          onClick={() => handleDelete(selectedUser.id)}
-                          disabled={loading}
-                        >
-                          Delete
-                        </button>
+                      <div className="win98-panel-footer">
+                        {!hasChanges && (
+                          <button 
+                            className="win98-button danger"
+                            onClick={() => handleDelete(selectedUser.id)}
+                            disabled={loading}
+                          >
+                            Delete
+                          </button>
+                        )}
                         {onStartChat && selectedUser.isLoggedIn && (
                           <button 
-                            className="win98-button small"
+                            className="win98-button"
                             onClick={handleChatWithUser}
                           >
                             Chat
                           </button>
                         )}
+                        {hasChanges && (
+                          <button 
+                            className="win98-button primary"
+                            onClick={handleUpdateUser}
+                            disabled={loading || !formData.username}
+                          >
+                            Update User
+                          </button>
+                        )}
+                        {hasChanges && (
+                          <button 
+                            className="win98-button"
+                            onClick={handleCancel}
+                            disabled={loading}
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="empty-message">Select a user to view details</div>
-                )}
-              </div>
-              
-              {isAdmin && (
-                <div className="user-form">
-                  <h3 className="win98-section-title">{editingId ? 'Edit User' : 'Add New User'}</h3>
-                  <form onSubmit={handleSubmit}>
-                    <div className="win98-form-row">
-                      <label className="win98-label" htmlFor="username">Username:</label>
-                      <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleInputChange}
-                        className="win98-input"
-                        required
-                      />
-                    </div>
-                    <div className="win98-form-row">
-                      <label className="win98-label" htmlFor="password">
-                        {editingId ? 'New Password:' : 'Password:'}
-                      </label>
-                      <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="win98-input"
-                        required={!editingId}
-                      />
-                    </div>
-                    <div className="win98-form-row">
-                      <label className="win98-label" htmlFor="isAdmin">Admin:</label>
-                      <input
-                        type="checkbox"
-                        id="isAdmin"
-                        name="isAdmin"
-                        checked={formData.isAdmin}
-                        onChange={handleInputChange}
-                        className="win98-checkbox"
-                      />
-                    </div>
-                    <div className="win98-form-footer">
-                      {editingId && (
-                        <button
-                          type="button"
-                          onClick={handleCancelEdit}
-                          className="win98-button"
-                          disabled={loading}
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <button
-                        type="submit"
-                        className="win98-button primary"
-                        disabled={loading || !formData.username || (!editingId && !formData.password)}
-                      >
-                        {editingId ? 'Update' : 'Add User'}
-                      </button>
-                    </div>
-                  </form>
                 </div>
+              ) : (
+                <div className="win98-section-title">Select a user to view details</div>
               )}
             </div>
           </div>

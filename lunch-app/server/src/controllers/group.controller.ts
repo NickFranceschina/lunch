@@ -113,6 +113,11 @@ export const createGroup = async (req: AuthRequest, res: Response) => {
       });
 
       if (user) {
+        // Remove user from any existing groups since a user can only be in one group
+        if (user.groups && user.groups.length > 0) {
+          user.groups = [];
+        }
+        
         if (!user.groups) user.groups = [];
         user.groups.push(group);
         user.currentGroupId = group.id;
@@ -259,6 +264,11 @@ export const joinGroup = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Remove user from any existing groups since a user can only be in one group
+    if (user.groups && user.groups.length > 0) {
+      user.groups = [];
+    }
+
     // Add user to group
     if (!user.groups) user.groups = [];
     user.groups.push(group);
@@ -370,14 +380,17 @@ export const addUserToGroup = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Remove user from any existing groups since a user can only be in one group
+    if (user.groups && user.groups.length > 0) {
+      user.groups = [];
+    }
+
     // Add user to group
     if (!user.groups) user.groups = [];
     user.groups.push(group);
     
-    // If user has no current group, set this as their current group
-    if (!user.currentGroupId) {
-      user.currentGroupId = groupId;
-    }
+    // Set this as their current group
+    user.currentGroupId = groupId;
     
     await userRepository.save(user);
 

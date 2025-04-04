@@ -175,6 +175,20 @@
 
 .win98-select {
   height: 21px;
+  width: 100%;
+  appearance: menulist;
+  -webkit-appearance: menulist;
+  background-color: #ffffff;
+  color: #000000;
+  font-family: "MS Sans Serif", Arial, sans-serif;
+  font-size: 11px;
+  padding: 2px 5px;
+}
+
+.win98-select option {
+  padding: 3px 5px;
+  font-family: "MS Sans Serif", Arial, sans-serif;
+  font-size: 11px;
 }
 
 .win98-checkbox {
@@ -270,10 +284,18 @@
 
 .win98-status.error {
   background-color: #ffcccc;
+  border-color: #cc0000;
 }
 
 .win98-status.success {
   background-color: #ccffcc;
+  border-color: #00cc00;
+}
+
+.win98-status.warning {
+  background-color: #ffffc0;
+  border-color: #ffaa00;
+  color: #775500;
 }
 
 /* Indicators */

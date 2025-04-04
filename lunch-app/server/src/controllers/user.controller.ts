@@ -9,12 +9,19 @@ const userRepository = AppDataSource.getRepository(User);
 /**
  * Get all users
  */
-export const getAllUsers = async (_req: Request, res: Response) => {
+export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await userRepository.find({
+    const includeGroups = req.query.includeGroups === 'true';
+    
+    const findOptions: any = {
       select: ['id', 'username', 'isAdmin', 'isLoggedIn', 'ipAddress', 'port', 'currentGroupId'],
-      relations: ['groups']
-    });
+    };
+    
+    if (includeGroups) {
+      findOptions.relations = ['groups'];
+    }
+    
+    const users = await userRepository.find(findOptions);
 
     res.status(200).json({
       success: true,

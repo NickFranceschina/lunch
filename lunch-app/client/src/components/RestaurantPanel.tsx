@@ -37,7 +37,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null);
-  const [editMode, setEditMode] = useState<boolean>(false);
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
   const { position, containerRef, dragHandleRef, resetPosition } = useDraggable();
 
   // Fetch restaurants on component mount
@@ -88,10 +88,28 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData({
+    const newFormData = {
       ...formData,
       [name]: value
-    });
+    };
+    setFormData(newFormData);
+    checkForChanges(newFormData);
+  };
+
+  // Check if form data has changed from the original restaurant data
+  const checkForChanges = (newFormData: Partial<Restaurant>) => {
+    if (!selectedRestaurantId) return;
+    
+    const selectedRestaurant = restaurants.find(r => r.id === selectedRestaurantId);
+    if (!selectedRestaurant) return;
+
+    const hasNameChange = newFormData.name !== selectedRestaurant.name;
+    const hasDescriptionChange = newFormData.description !== (selectedRestaurant.description || '');
+    const hasAddressChange = newFormData.address !== (selectedRestaurant.address || '');
+    const hasPhoneChange = newFormData.phone !== (selectedRestaurant.phone || '');
+    const hasWebsiteChange = newFormData.website !== (selectedRestaurant.website || '');
+
+    setHasChanges(hasNameChange || hasDescriptionChange || hasAddressChange || hasPhoneChange || hasWebsiteChange);
   };
 
   // Handle form submission for new/updated restaurant
@@ -133,7 +151,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
         website: ''
       });
       setEditingId(null);
-      setEditMode(false);
+      setSelectedRestaurantId(null);
       await fetchRestaurants();
     } catch (err) {
       setError(`Error ${editingId ? 'updating' : 'creating'} restaurant. Please try again.`);
@@ -153,15 +171,22 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       website: restaurant.website || ''
     });
     setEditingId(restaurant.id);
-    setEditMode(true);
+    setSelectedRestaurantId(restaurant.id);
+    setHasChanges(false);
   };
 
   // Select a restaurant
   const handleSelectRestaurant = (restaurant: Restaurant) => {
     setSelectedRestaurantId(restaurant.id);
-    if (editMode) {
-      handleEdit(restaurant);
-    }
+    setFormData({
+      name: restaurant.name,
+      description: restaurant.description || '',
+      address: restaurant.address || '',
+      phone: restaurant.phone || '',
+      website: restaurant.website || ''
+    });
+    setEditingId(restaurant.id);
+    setHasChanges(false);
   };
 
   // Delete a restaurant
@@ -187,8 +212,8 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       if (id === selectedRestaurantId) {
         setSelectedRestaurantId(restaurants.length > 0 ? restaurants[0].id : null);
       }
-      setEditMode(false);
       setEditingId(null);
+      setSelectedRestaurantId(null);
     } catch (err) {
       setError('Error deleting restaurant. Please try again.');
       console.error('Error deleting restaurant:', err);
@@ -207,20 +232,63 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
       website: ''
     });
     setEditingId(null);
-    setEditMode(true);
+    setSelectedRestaurantId(null);
   };
 
-  // Cancel edit mode
-  const handleCancelEdit = () => {
-    setEditMode(false);
-    setEditingId(null);
-    setFormData({
-      name: '',
-      description: '',
-      address: '',
-      phone: '',
-      website: ''
-    });
+  // Cancel changes
+  const handleCancel = () => {
+    if (!selectedRestaurantId) {
+      // If adding a new restaurant, cancel back to selection
+      if (restaurants.length > 0) {
+        handleSelectRestaurant(restaurants[0]);
+      }
+    } else {
+      // If editing, reset to original values
+      const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
+      if (restaurant) {
+        setFormData({
+          name: restaurant.name,
+          description: restaurant.description || '',
+          address: restaurant.address || '',
+          phone: restaurant.phone || '',
+          website: restaurant.website || ''
+        });
+        setEditingId(restaurant.id);
+        setHasChanges(false);
+      }
+    }
+  };
+
+  // Handle form submission for updates
+  const handleUpdate = async () => {
+    if (!selectedRestaurantId) return;
+    
+    try {
+      setLoading(true);
+      
+      const response = await fetch(`http://localhost:3001/api/restaurants/${selectedRestaurantId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update restaurant');
+      }
+
+      // Refresh data
+      await fetchRestaurants();
+      setHasChanges(false);
+      setError(null);
+    } catch (err) {
+      setError('Error updating restaurant. Please try again.');
+      console.error('Error updating restaurant:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get selected restaurant
@@ -276,7 +344,7 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                 )}
               </div>
               
-              {!editMode && (
+              {!selectedRestaurantId && (
                 <button 
                   className="win98-button"
                   onClick={handleAddNewClick}
@@ -288,10 +356,10 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
             </div>
 
             <div className="win98-panel-right">
-              {editMode ? (
+              {!selectedRestaurantId ? (
                 <div className="win98-panel-section">
                   <div className="win98-section-title">
-                    {editingId ? 'Edit Restaurant' : 'Add New Restaurant'}
+                    Add New Restaurant
                   </div>
                   <form onSubmit={handleSubmit}>
                     <div className="win98-form-row">
@@ -358,65 +426,86 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                       <button 
                         type="button" 
                         className="win98-button"
-                        onClick={handleCancelEdit}
+                        onClick={handleCancel}
                       >
                         Cancel
                       </button>
-                      {editingId && (
-                        <button 
-                          type="button" 
-                          className="win98-button danger"
-                          onClick={() => handleDelete(editingId)}
-                          disabled={loading}
-                        >
-                          Delete
-                        </button>
-                      )}
                       <button 
                         type="submit" 
                         className="win98-button primary"
                         disabled={loading}
                       >
-                        {editingId ? 'Update' : 'Add'}
+                        Add
                       </button>
                     </div>
                   </form>
                 </div>
-              ) : (
-                selectedRestaurant ? (
-                  <div className="win98-panel-section">
-                    <div className="win98-section-title">Restaurant Details</div>
-                    <div className="win98-fieldset">
-                      <div className="win98-form-row">
-                        <span className="win98-label">Name:</span>
-                        <span>{selectedRestaurant.name}</span>
-                      </div>
-                      {selectedRestaurant.description && (
-                        <div className="win98-form-row">
-                          <span className="win98-label">Description:</span>
-                          <span>{selectedRestaurant.description}</span>
-                        </div>
-                      )}
-                      {selectedRestaurant.address && (
-                        <div className="win98-form-row">
-                          <span className="win98-label">Address:</span>
-                          <span>{selectedRestaurant.address}</span>
-                        </div>
-                      )}
-                      {selectedRestaurant.phone && (
-                        <div className="win98-form-row">
-                          <span className="win98-label">Phone:</span>
-                          <span>{selectedRestaurant.phone}</span>
-                        </div>
-                      )}
-                      {selectedRestaurant.website && (
-                        <div className="win98-form-row">
-                          <span className="win98-label">Website:</span>
-                          <span>{selectedRestaurant.website}</span>
-                        </div>
-                      )}
+              ) : selectedRestaurant ? (
+                <div className="win98-panel-section">
+                  <div className="win98-section-title">Restaurant Details</div>
+                  <div className="win98-fieldset">
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="name">Name:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        required
+                      />
                     </div>
-                    <div className="win98-panel-footer">
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="description">Description:</label>
+                      <textarea
+                        className="win98-textarea"
+                        id="description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="address">Address:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="phone">Phone:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="phone"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="website">Website:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="website"
+                        name="website"
+                        value={formData.website}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                  <div className="win98-panel-footer">
+                    {!hasChanges && (
                       <button 
                         className="win98-button danger"
                         onClick={() => handleDelete(selectedRestaurant.id)}
@@ -424,18 +513,29 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
                       >
                         Delete
                       </button>
+                    )}
+                    {hasChanges && (
                       <button 
                         className="win98-button primary"
-                        onClick={() => handleEdit(selectedRestaurant)}
+                        onClick={handleUpdate}
+                        disabled={loading || !formData.name}
+                      >
+                        Update
+                      </button>
+                    )}
+                    {hasChanges && (
+                      <button 
+                        className="win98-button"
+                        onClick={handleCancel}
                         disabled={loading}
                       >
-                        Edit
+                        Cancel
                       </button>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="win98-section-title">Select a restaurant to view details</div>
-                )
+                </div>
+              ) : (
+                <div className="win98-section-title">Select a restaurant to view details</div>
               )}
             </div>
           </div>
