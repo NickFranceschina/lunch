@@ -162,12 +162,20 @@ const MainWindow: React.FC = () => {
   // Handle logout
   const handleLogout = async () => {
     try {
-      await authService.logout(token);
-      // Disconnect WebSocket
-      websocketService.disconnect();
+      // Only call the API logout if we have a token
+      if (token) {
+        await authService.logout(token);
+      }
+      
+      // Ensure WebSocket is disconnected
+      if (websocketService && wsConnected) {
+        websocketService.disconnect();
+      }
+      
+      // Reset connection state first
       setWsConnected(false);
       
-      // Clear auth state
+      // Then clear auth state
       setIsLoggedIn(false);
       setCurrentUser('');
       setCurrentUserId(0);
@@ -177,12 +185,18 @@ const MainWindow: React.FC = () => {
       setToken('');
       setIsAdmin(false);
       
-      // Remove token from localStorage
+      // Finally remove token from localStorage
       localStorage.removeItem('token');
       showStatusMessage('You have been logged out');
     } catch (error) {
       console.error('Logout failed:', error);
       showStatusMessage('Logout failed', 5000);
+      
+      // Still clear local state even if the API call fails
+      setIsLoggedIn(false);
+      setWsConnected(false);
+      setToken('');
+      localStorage.removeItem('token');
     }
   };
 

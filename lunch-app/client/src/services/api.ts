@@ -288,6 +288,22 @@ export const groupService = {
     }
     
     return response.json();
+  },
+  
+  deleteGroup: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete group');
+    }
+    
+    return response.json();
   }
 };
 

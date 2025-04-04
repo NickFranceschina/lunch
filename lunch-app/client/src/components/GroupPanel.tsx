@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { groupService } from '../services/api';
 import './GroupPanel.css';
+import './Win98Panel.css';
 
 interface User {
   id: number;
@@ -54,8 +55,9 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     description: '',
     notificationTime: '12:00'
   });
-  const [editMode, setEditMode] = useState<boolean>(false);
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'members'>('details');
 
   // Fetch groups on component mount
   useEffect(() => {
@@ -153,12 +155,13 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     }
     
     setFormData({
-      notificationTime: timeString,
-      name: '', // Only used for new groups
-      description: ''
+      name: group.name,
+      description: group.description || '',
+      notificationTime: timeString
     });
     
     setShowUserSelector(false);
+    setShowAddForm(false);
   };
 
   // Handle form submission for new group
@@ -176,6 +179,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
         description: '',
         notificationTime: '12:00'
       });
+      setShowAddForm(false);
       await fetchGroups();
     } catch (err) {
       setError('Error creating group. Please try again.');
@@ -186,21 +190,23 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   };
 
   // Update group notification time
-  const handleUpdateNotificationTime = async () => {
+  const handleUpdateGroup = async () => {
     if (!selectedGroup) return;
     
     try {
       setLoading(true);
       
       await groupService.updateGroup(selectedGroup.id, {
+        name: formData.name,
+        description: formData.description,
         notificationTime: formData.notificationTime
       }, token);
 
       await fetchGroups();
-      alert('Notification time updated successfully');
+      setError(null);
     } catch (err) {
-      setError('Error updating notification time. Please try again.');
-      console.error('Error updating notification time:', err);
+      setError('Failed to update group. Please try again.');
+      console.error('Failed to update group:', err);
     } finally {
       setLoading(false);
     }
@@ -210,14 +216,11 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const handleJoinGroup = async (groupId: number) => {
     try {
       setLoading(true);
-      
       await groupService.joinGroup(groupId, token);
-
       await fetchGroups();
-      alert('Successfully joined group');
     } catch (err) {
-      setError('Error joining group. Please try again.');
-      console.error('Error joining group:', err);
+      setError('Failed to join group. Please try again.');
+      console.error('Failed to join group:', err);
     } finally {
       setLoading(false);
     }
@@ -227,344 +230,449 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const handleLeaveGroup = async (groupId: number) => {
     try {
       setLoading(true);
-      
       await groupService.leaveGroup(groupId, token);
-
       await fetchGroups();
-      alert('Successfully left group');
     } catch (err) {
-      setError('Error leaving group. Please try again.');
-      console.error('Error leaving group:', err);
+      setError('Failed to leave group. Please try again.');
+      console.error('Failed to leave group:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Add user to group (admin only)
+  // Add a user to a group
   const handleAddUserToGroup = async () => {
     if (!selectedGroup || !selectedUser) return;
     
     try {
       setLoading(true);
-      
       await groupService.addUserToGroup(selectedGroup.id, selectedUser, token);
-      
       await fetchGroups();
-      alert('User successfully added to group');
+      setSelectedUser(null);
       setShowUserSelector(false);
     } catch (err) {
-      setError('Error adding user to group. Please try again.');
-      console.error('Error adding user to group:', err);
+      setError('Failed to add user to group. Please try again.');
+      console.error('Failed to add user to group:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Remove user from group (admin only)
+  // Remove a user from a group
   const handleRemoveUserFromGroup = async (userId: number) => {
     if (!selectedGroup) return;
     
-    // Don't allow removing yourself
-    if (userId === currentUserId) {
-      alert('You cannot remove yourself from a group this way. Use the Leave Group button instead.');
+    if (!window.confirm('Are you sure you want to remove this user from the group?')) {
       return;
     }
     
-    if (window.confirm('Are you sure you want to remove this user from the group?')) {
-      try {
-        setLoading(true);
-        
-        await groupService.removeUserFromGroup(selectedGroup.id, userId, token);
-        
-        await fetchGroups();
-        alert('User successfully removed from group');
-      } catch (err) {
-        setError('Error removing user from group. Please try again.');
-        console.error('Error removing user from group:', err);
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setLoading(true);
+      await groupService.removeUserFromGroup(selectedGroup.id, userId, token);
+      await fetchGroups();
+    } catch (err) {
+      setError('Failed to remove user from group. Please try again.');
+      console.error('Failed to remove user from group:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Delete a group
+  const handleDeleteGroup = async (groupId: number) => {
+    if (!window.confirm('Are you sure you want to delete this group?')) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await groupService.deleteGroup(groupId, token);
+      await fetchGroups();
+    } catch (err) {
+      setError('Failed to delete group. Please try again.');
+      console.error('Failed to delete group:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format time for display
   const formatTime = (timeString?: string) => {
     if (!timeString) return 'Not set';
+    
     try {
-      // If it's a date object, format it
       if (timeString.includes('T')) {
         const date = new Date(timeString);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       }
       return timeString;
     } catch (e) {
-      return timeString || 'Not set';
+      return timeString;
     }
   };
 
+  // Check if user is in group
   const isUserInGroup = (group: Group) => {
     return group.users?.some(user => user.id === currentUserId) || false;
   };
 
-  // Reset form when switching to add new mode
+  // Handle Add New Group button
   const handleAddNewClick = () => {
-    setEditMode(true);
     setFormData({
       name: '',
       description: '',
       notificationTime: '12:00'
     });
+    setSelectedGroup(null);
+    setShowAddForm(true);
   };
 
-  // Cancel add mode
+  // Cancel add new group
   const handleCancelAddNew = () => {
-    setEditMode(false);
-    if (selectedGroup) {
-      selectGroup(selectedGroup);
+    setShowAddForm(false);
+    if (groups.length > 0) {
+      selectGroup(groups[0]);
     }
-  };
-
-  // Toggle user selector
-  const handleToggleUserSelector = () => {
-    setShowUserSelector(!showUserSelector);
   };
 
   if (!isVisible) return null;
 
-  // Filter out users already in the group for the dropdown
-  const availableUsers = allUsers.filter(user => 
-    !selectedGroup?.users?.some(groupUser => groupUser.id === user.id)
-  );
-
   return (
-    <div className="group-panel-overlay">
-      <div className="group-panel">
-        <h2>Group Management</h2>
+    <div className="win98-panel-overlay">
+      <div className="win98-panel">
+        <div className="win98-panel-header">
+          <div className="win98-panel-title">Group Management</div>
+          <button className="win98-panel-close" onClick={onClose}>×</button>
+        </div>
         
-        {error && <div className="error-message">{error}</div>}
-        
-        <div className="panel-layout">
-          <div className="group-list-container">
-            <h3>Groups</h3>
-            {loading && groups.length === 0 ? (
-              <p>Loading groups...</p>
-            ) : groups.length === 0 ? (
-              <p>No groups found.</p>
-            ) : (
-              <div className="group-list">
-                {groups.map(group => (
-                  <div 
-                    key={group.id} 
-                    className={`group-item ${selectedGroup?.id === group.id ? 'selected-group' : ''} ${currentGroupId === group.id ? 'current-group' : ''}`}
-                    onClick={() => {
-                      selectGroup(group);
-                      setEditMode(false);
-                    }}
-                  >
-                    <span>{group.name}</span>
-                  </div>
-                ))}
+        <div className="win98-panel-content">
+          {error && <div className="win98-status error">{error}</div>}
+          
+          <div className="win98-split-panel">
+            <div className="win98-panel-left">
+              <div className="win98-section-title">Groups</div>
+              <div className="win98-list">
+                {loading && groups.length === 0 ? (
+                  <div className="win98-list-item">Loading groups...</div>
+                ) : groups.length === 0 ? (
+                  <div className="win98-list-item">No groups found.</div>
+                ) : (
+                  groups.map(group => (
+                    <div 
+                      key={group.id} 
+                      className={`win98-list-item ${selectedGroup?.id === group.id ? 'selected' : ''}`}
+                      onClick={() => selectGroup(group)}
+                    >
+                      {group.name}
+                      {group.id === currentGroupId && ' (Current)'}
+                    </div>
+                  ))
+                )}
               </div>
-            )}
+              
+              {isAdmin && (
+                <button 
+                  className="win98-button"
+                  onClick={handleAddNewClick}
+                  disabled={loading}
+                >
+                  Add New Group
+                </button>
+              )}
+            </div>
 
-            {!editMode ? (
-              <button 
-                className="add-button" 
-                onClick={handleAddNewClick}
-                disabled={loading}
-              >
-                Add New Group
-              </button>
-            ) : (
-              <>
-                <h3>Add New Group</h3>
-                <form onSubmit={handleSubmit}>
-                  <div className="form-group">
-                    <label htmlFor="name">Group Name:</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
+            <div className="win98-panel-right">
+              {showAddForm ? (
+                <div className="win98-panel-section">
+                  <div className="win98-section-title">Add New Group</div>
+                  <form onSubmit={handleSubmit}>
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="name">Name:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="description">Description:</label>
+                      <textarea
+                        className="win98-textarea"
+                        id="description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="notificationTime">Notification Time:</label>
+                      <input
+                        className="win98-input"
+                        type="time"
+                        id="notificationTime"
+                        name="notificationTime"
+                        value={formData.notificationTime}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-panel-footer">
+                      <button 
+                        type="button" 
+                        className="win98-button"
+                        onClick={handleCancelAddNew}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="win98-button primary"
+                        disabled={loading}
+                      >
+                        Create Group
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : selectedGroup ? (
+                <div className="win98-panel-section">
+                  <div className="win98-tabs">
+                    <div 
+                      className={`win98-tab ${activeTab === 'details' ? 'active' : ''}`} 
+                      onClick={() => setActiveTab('details')}
+                    >
+                      Details
+                    </div>
+                    <div 
+                      className={`win98-tab ${activeTab === 'members' ? 'active' : ''}`} 
+                      onClick={() => setActiveTab('members')}
+                    >
+                      Members
+                    </div>
                   </div>
                   
-                  <div className="form-group">
-                    <label htmlFor="description">Description:</label>
-                    <input
-                      type="text"
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="notificationTime">Notification Time:</label>
-                    <input
-                      type="time"
-                      id="notificationTime"
-                      name="notificationTime"
-                      value={formData.notificationTime}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div className="button-group">
-                    <button type="submit" className="add-button" disabled={loading}>
-                      Add Group
-                    </button>
-                    <button 
-                      type="button" 
-                      className="cancel-button" 
-                      onClick={handleCancelAddNew}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
-
-          <div className="group-details">
-            <h3>Group Details</h3>
-            {selectedGroup && !editMode ? (
-              <>
-                <div className="info-row">
-                  <span>Current Selection:</span>
-                  <span>{selectedGroup.currentRestaurant?.name || 'None'}</span>
-                </div>
-                <div className="info-row">
-                  <span>Notification Time:</span>
-                  <span>{formatTime(selectedGroup.notificationTime)}</span>
-                </div>
-                <div className="info-row">
-                  <span>Yes Votes:</span>
-                  <span>{selectedGroup.yesVotes}</span>
-                </div>
-                <div className="info-row">
-                  <span>No Votes:</span>
-                  <span>{selectedGroup.noVotes}</span>
-                </div>
-                <div className="info-row">
-                  <span>Status:</span>
-                  <span>{selectedGroup.isConfirmed ? 'Confirmed' : 'Not Confirmed'}</span>
-                </div>
-
-                <div className="group-actions">
-                  {isUserInGroup(selectedGroup) ? (
-                    <button 
-                      onClick={() => handleLeaveGroup(selectedGroup.id)}
-                      className="leave-button"
-                    >
-                      Leave Group
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleJoinGroup(selectedGroup.id)}
-                      className="join-button"
-                    >
-                      Join Group
-                    </button>
-                  )}
-                </div>
-
-                <div className="update-notification">
-                  <h3>Update Notification Time</h3>
-                  <div className="update-form">
-                    <input
-                      type="time"
-                      name="notificationTime"
-                      value={formData.notificationTime}
-                      onChange={handleInputChange}
-                    />
-                    <button 
-                      onClick={handleUpdateNotificationTime}
-                      disabled={loading || !isUserInGroup(selectedGroup)}
-                    >
-                      Update Time
-                    </button>
-                  </div>
-                </div>
-
-                <div className="members-list">
-                  <h3>Group Members</h3>
-                  {selectedGroup.users && selectedGroup.users.length > 0 ? (
-                    <div>
-                      <ul className="user-list">
-                        {selectedGroup.users.map(user => (
-                          <li key={user.id} className="user-list-item">
-                            {user.username}
-                            {user.id === currentUserId && <span className="current-user-indicator"> (You)</span>}
-                            {isAdmin && user.id !== currentUserId && (
-                              <button 
-                                className="remove-user-button"
-                                onClick={() => handleRemoveUserFromGroup(user.id)}
-                                title="Remove user from group"
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {isAdmin && (
-                        <div className="admin-actions">
-                          {!showUserSelector ? (
+                  {activeTab === 'details' && (
+                    <>
+                      {isAdmin ? (
+                        <form>
+                          <div className="win98-form-row">
+                            <label className="win98-label" htmlFor="name">Name:</label>
+                            <input
+                              className="win98-input"
+                              type="text"
+                              id="name"
+                              name="name"
+                              value={formData.name}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          
+                          <div className="win98-form-row">
+                            <label className="win98-label" htmlFor="description">Description:</label>
+                            <textarea
+                              className="win98-textarea"
+                              id="description"
+                              name="description"
+                              value={formData.description}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          
+                          <div className="win98-form-row">
+                            <label className="win98-label" htmlFor="notificationTime">Notification Time:</label>
+                            <input
+                              className="win98-input"
+                              type="time"
+                              id="notificationTime"
+                              name="notificationTime"
+                              value={formData.notificationTime}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          
+                          <div className="win98-form-row">
+                            <label className="win98-label">Current Restaurant:</label>
+                            <span>
+                              {selectedGroup.currentRestaurant ? 
+                                selectedGroup.currentRestaurant.name : 
+                                'Not selected'}
+                            </span>
+                          </div>
+                          
+                          <div className="win98-form-row">
+                            <label className="win98-label">Voting Status:</label>
+                            <span>
+                              {selectedGroup.isConfirmed ? 
+                                '✅ Confirmed' : 
+                                `👥 Yes: ${selectedGroup.yesVotes}, No: ${selectedGroup.noVotes}`}
+                            </span>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="win98-fieldset">
+                          <div className="win98-form-row">
+                            <span className="win98-label">Name:</span>
+                            <span>{selectedGroup.name}</span>
+                          </div>
+                          
+                          {selectedGroup.description && (
+                            <div className="win98-form-row">
+                              <span className="win98-label">Description:</span>
+                              <span>{selectedGroup.description}</span>
+                            </div>
+                          )}
+                          
+                          <div className="win98-form-row">
+                            <span className="win98-label">Notification Time:</span>
+                            <span>{formatTime(selectedGroup.notificationTime)}</span>
+                          </div>
+                          
+                          <div className="win98-form-row">
+                            <span className="win98-label">Current Restaurant:</span>
+                            <span>
+                              {selectedGroup.currentRestaurant ? 
+                                selectedGroup.currentRestaurant.name : 
+                                'Not selected'}
+                            </span>
+                          </div>
+                          
+                          <div className="win98-form-row">
+                            <span className="win98-label">Voting Status:</span>
+                            <span>
+                              {selectedGroup.isConfirmed ? 
+                                '✅ Confirmed' : 
+                                `👥 Yes: ${selectedGroup.yesVotes}, No: ${selectedGroup.noVotes}`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="win98-panel-footer">
+                        {isUserInGroup(selectedGroup) ? (
+                          <button 
+                            className="win98-button"
+                            onClick={() => handleLeaveGroup(selectedGroup.id)}
+                            disabled={loading}
+                          >
+                            Leave Group
+                          </button>
+                        ) : (
+                          <button 
+                            className="win98-button"
+                            onClick={() => handleJoinGroup(selectedGroup.id)}
+                            disabled={loading}
+                          >
+                            Join Group
+                          </button>
+                        )}
+                        
+                        {isAdmin && (
+                          <>
                             <button 
-                              className="add-button"
-                              onClick={handleToggleUserSelector}
+                              className="win98-button danger"
+                              onClick={() => handleDeleteGroup(selectedGroup.id)}
+                              disabled={loading}
                             >
-                              Add User to Group
+                              Delete Group
                             </button>
-                          ) : (
-                            <div className="user-selector">
-                              <select 
-                                value={selectedUser || ""}
-                                onChange={handleUserSelect}
-                              >
-                                <option value="">-- Select User --</option>
-                                {availableUsers.map(user => (
-                                  <option key={user.id} value={user.id}>
-                                    {user.username}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="button-group">
+                            <button 
+                              className="win98-button primary"
+                              onClick={handleUpdateGroup}
+                              disabled={loading}
+                            >
+                              Update Group
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  
+                  {activeTab === 'members' && (
+                    <>
+                      <div className="win98-list" style={{ height: "150px" }}>
+                        {selectedGroup.users && selectedGroup.users.length > 0 ? (
+                          selectedGroup.users.map(user => (
+                            <div key={user.id} className="win98-list-item">
+                              {user.username}
+                              {isAdmin && user.id !== currentUserId && (
                                 <button 
-                                  onClick={handleAddUserToGroup}
-                                  disabled={!selectedUser || loading}
-                                  className="add-button"
+                                  className="win98-button small"
+                                  style={{ float: 'right' }}
+                                  onClick={() => handleRemoveUserFromGroup(user.id)}
+                                  disabled={loading}
                                 >
-                                  Add User
+                                  Remove
                                 </button>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="win98-list-item">No members in this group</div>
+                        )}
+                      </div>
+                      
+                      {isAdmin && (
+                        <div className="win98-panel-footer">
+                          {showUserSelector ? (
+                            <div className="win98-form-row">
+                              <select 
+                                className="win98-select"
+                                onChange={handleUserSelect}
+                                value={selectedUser || ''}
+                              >
+                                <option value="">Select a user to add</option>
+                                {allUsers
+                                  .filter(user => !selectedGroup.users?.some(u => u.id === user.id))
+                                  .map(user => (
+                                    <option key={user.id} value={user.id}>
+                                      {user.username}
+                                    </option>
+                                  ))
+                                }
+                              </select>
+                              <div style={{ display: 'flex', marginTop: '8px', gap: '8px' }}>
                                 <button 
-                                  onClick={handleToggleUserSelector}
-                                  className="cancel-button"
+                                  className="win98-button"
+                                  onClick={() => setShowUserSelector(false)}
                                 >
                                   Cancel
                                 </button>
+                                <button 
+                                  className="win98-button primary"
+                                  onClick={handleAddUserToGroup}
+                                  disabled={!selectedUser}
+                                >
+                                  Add User
+                                </button>
                               </div>
                             </div>
+                          ) : (
+                            <button 
+                              className="win98-button"
+                              onClick={() => setShowUserSelector(true)}
+                              disabled={loading}
+                            >
+                              Add User to Group
+                            </button>
                           )}
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <p>No members in this group</p>
+                    </>
                   )}
                 </div>
-              </>
-            ) : !selectedGroup ? (
-              <p>Select a group to view details</p>
-            ) : null}
+              ) : (
+                <div className="win98-section-title">Select a group to view details</div>
+              )}
+            </div>
           </div>
         </div>
-        
-        <button className="close-button" onClick={onClose}>Close</button>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { websocketService } from '../services/websocket.service';
 import './UserPanel.css';
+import './Win98Panel.css';
 
 interface User {
   id: number;
@@ -198,203 +199,243 @@ const UserPanel: React.FC<UserPanelProps> = ({
 
   const handleUserSelect = (user: User) => {
     setSelectedUserId(user.id);
-    
-    // If admin, also set up edit form
-    if (isAdmin) {
-      setFormData({
-        username: user.username,
-        password: '', // Password field is cleared for security
-        isAdmin: user.isAdmin
-      });
-      setEditingId(user.id);
-    }
   };
-  
-  // Get the selected user
+
+  // Toggle showing only logged in users
+  const handleToggleShowOnlyLoggedIn = () => {
+    setShowOnlyLoggedIn(!showOnlyLoggedIn);
+  };
+
+  // Get selected user
   const getSelectedUser = () => {
-    return users.find(user => user.id === selectedUserId);
+    return users.find(u => u.id === selectedUserId) || null;
   };
-  
-  // Handle starting a chat with a user
+
+  // Handle start chat with user
   const handleChatWithUser = () => {
     if (selectedUserId && onStartChat) {
       onStartChat(selectedUserId);
     }
   };
 
+  // Cancel edit mode
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({
+      username: '',
+      password: '',
+      isAdmin: false
+    });
+  };
+
   if (!isVisible) return null;
 
+  const selectedUser = getSelectedUser();
+
   return (
-    <div className="user-panel window">
-      <div className="title-bar">
-        <div className="title-bar-text">User Management</div>
-        <div className="title-bar-controls">
-          <button aria-label="Close" onClick={onClose}></button>
+    <div className="win98-panel-overlay">
+      <div className="win98-panel">
+        <div className="win98-panel-header">
+          <div className="win98-panel-title">User Management</div>
+          <button className="win98-panel-close" onClick={onClose}>×</button>
         </div>
-      </div>
-      <div className="window-body">
-        <div className="panel-content">
-          {error && <div className="error-message">{error}</div>}
+        
+        <div className="win98-panel-content">
+          {error && <div className="win98-status error">{error}</div>}
           
-          <div className="users-section">
-            <div className="filter-section">
-              <label>
-                <input 
-                  type="checkbox" 
-                  checked={showOnlyLoggedIn} 
-                  onChange={() => setShowOnlyLoggedIn(!showOnlyLoggedIn)} 
-                />
-                Show only logged in users
-              </label>
-              <button 
-                onClick={fetchUsers} 
-                disabled={loading}
-                className="refresh-button"
-              >
-                Refresh
-              </button>
+          <div className="win98-tabs">
+            <div 
+              className={`win98-tab ${showOnlyLoggedIn ? 'active' : ''}`} 
+              onClick={() => setShowOnlyLoggedIn(true)}
+            >
+              Online Users
             </div>
-            
-            <div className="user-list-container">
-              <div className="user-list">
-                {loading ? (
-                  <div className="loading">Loading users...</div>
+            <div 
+              className={`win98-tab ${!showOnlyLoggedIn ? 'active' : ''}`} 
+              onClick={() => setShowOnlyLoggedIn(false)}
+            >
+              All Users
+            </div>
+          </div>
+          
+          <div className="win98-split-panel">
+            <div className="win98-panel-left">
+              <div className="win98-section-title">
+                {showOnlyLoggedIn ? 'Online Users' : 'All Users'}
+              </div>
+              <div className="win98-list">
+                {loading && users.length === 0 ? (
+                  <div className="win98-list-item">Loading users...</div>
                 ) : users.length === 0 ? (
-                  <div className="no-users">No users found</div>
+                  <div className="win98-list-item">No users found.</div>
                 ) : (
                   users.map(user => (
                     <div 
-                      key={user.id}
-                      className={`user-item ${selectedUserId === user.id ? 'selected' : ''} ${user.isLoggedIn ? 'logged-in' : 'logged-out'}`}
+                      key={user.id} 
+                      className={`win98-list-item ${selectedUserId === user.id ? 'selected' : ''}`}
                       onClick={() => handleUserSelect(user)}
                     >
-                      <div className="user-item-name">
-                        <span className="status-dot"></span>
-                        <span>{user.username}</span>
-                        {user.isAdmin && <span className="admin-badge">Admin</span>}
-                      </div>
+                      {user.isLoggedIn && <span className="win98-online-indicator"></span>}
+                      {!user.isLoggedIn && <span className="win98-offline-indicator"></span>}
+                      {user.username} {user.isAdmin && '(Admin)'}
                     </div>
                   ))
                 )}
               </div>
-            </div>
-            
-            <div className="user-actions">
-              {selectedUserId && selectedUserId !== currentUserId && onStartChat && (
+              
+              {isAdmin && (
                 <button 
-                  onClick={handleChatWithUser}
-                  className="chat-button"
-                  disabled={!getSelectedUser()?.isLoggedIn}
+                  className="win98-button"
+                  onClick={() => setEditingId(0)}
+                  disabled={loading}
                 >
-                  Chat with User
+                  Add New User
                 </button>
               )}
             </div>
-          </div>
-          
-          {isAdmin && (
-            <div className="user-form-section">
-              <h3>{editingId ? 'Edit User' : 'Create New User'}</h3>
-              <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label htmlFor="username">Username:</label>
-                  <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="password">Password:</label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required={!editingId} // Only required for new users
-                    placeholder={editingId ? "(leave blank to keep current)" : ""}
-                  />
-                </div>
-                
-                <div className="form-group checkbox">
-                  <label>
-                    <input
-                      type="checkbox"
-                      name="isAdmin"
-                      checked={formData.isAdmin}
-                      onChange={handleInputChange}
-                    />
-                    Admin User
-                  </label>
-                </div>
-                
-                <div className="form-buttons">
-                  <button type="submit" disabled={loading}>
-                    {editingId ? 'Update User' : 'Create User'}
-                  </button>
-                  
-                  {editingId && (
-                    <>
+
+            <div className="win98-panel-right">
+              {editingId !== null ? (
+                <div className="win98-panel-section">
+                  <div className="win98-section-title">
+                    {editingId ? 'Edit User' : 'Add New User'}
+                  </div>
+                  <form onSubmit={handleSubmit}>
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="username">Username:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="username"
+                        name="username"
+                        value={formData.username}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="password">
+                        {editingId ? 'New Password:' : 'Password:'}
+                      </label>
+                      <input
+                        className="win98-input"
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required={!editingId}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="isAdmin">Admin:</label>
+                      <div>
+                        <input
+                          className="win98-checkbox"
+                          type="checkbox"
+                          id="isAdmin"
+                          name="isAdmin"
+                          checked={formData.isAdmin}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="win98-panel-footer">
                       <button 
                         type="button" 
-                        onClick={() => {
-                          setFormData({ username: '', password: '', isAdmin: false });
-                          setEditingId(null);
-                        }}
-                        disabled={loading}
+                        className="win98-button"
+                        onClick={handleCancelEdit}
                       >
                         Cancel
                       </button>
-                      
+                      {editingId > 0 && (
+                        <button 
+                          type="button" 
+                          className="win98-button danger"
+                          onClick={() => handleDelete(editingId)}
+                          disabled={loading}
+                        >
+                          Delete
+                        </button>
+                      )}
                       <button 
-                        type="button"
-                        onClick={() => handleDelete(editingId)}
-                        className="delete-button"
-                        disabled={loading || editingId === currentUserId}
+                        type="submit" 
+                        className="win98-button primary"
+                        disabled={loading}
                       >
-                        Delete User
+                        {editingId ? 'Update' : 'Add'}
                       </button>
-                    </>
-                  )}
+                    </div>
+                  </form>
                 </div>
-              </form>
-            </div>
-          )}
-          
-          {getSelectedUser() && (
-            <div className="user-details">
-              <h3>User Details</h3>
-              <div className="details-row">
-                <span className="label">Username:</span>
-                <span className="value">{getSelectedUser()?.username}</span>
-              </div>
-              <div className="details-row">
-                <span className="label">Status:</span>
-                <span className="value">
-                  {getSelectedUser()?.isLoggedIn ? 'Online' : 'Offline'}
-                </span>
-              </div>
-              <div className="details-row">
-                <span className="label">Role:</span>
-                <span className="value">
-                  {getSelectedUser()?.isAdmin ? 'Administrator' : 'Regular User'}
-                </span>
-              </div>
-              {getSelectedUser()?.currentGroupId && (
-                <div className="details-row">
-                  <span className="label">Current Group:</span>
-                  <span className="value">
-                    {getSelectedUser()?.groups?.find(g => g.id === getSelectedUser()?.currentGroupId)?.name || 'Unknown'}
-                  </span>
-                </div>
+              ) : (
+                selectedUser ? (
+                  <div className="win98-panel-section">
+                    <div className="win98-section-title">User Details</div>
+                    <div className="win98-fieldset">
+                      <div className="win98-form-row">
+                        <span className="win98-label">Username:</span>
+                        <span>{selectedUser.username}</span>
+                      </div>
+                      <div className="win98-form-row">
+                        <span className="win98-label">Status:</span>
+                        <span>
+                          {selectedUser.isLoggedIn ? 
+                            <><span className="win98-online-indicator"></span>Online</> : 
+                            <><span className="win98-offline-indicator"></span>Offline</>
+                          }
+                        </span>
+                      </div>
+                      <div className="win98-form-row">
+                        <span className="win98-label">Role:</span>
+                        <span>{selectedUser.isAdmin ? 'Administrator' : 'Regular User'}</span>
+                      </div>
+                      {selectedUser.groups && selectedUser.groups.length > 0 && (
+                        <div className="win98-form-row">
+                          <span className="win98-label">Groups:</span>
+                          <span>{selectedUser.groups.map(g => g.name).join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="win98-panel-footer">
+                      {onStartChat && selectedUser.id !== currentUserId && (
+                        <button 
+                          className="win98-button"
+                          onClick={handleChatWithUser}
+                          disabled={!selectedUser.isLoggedIn}
+                        >
+                          Chat
+                        </button>
+                      )}
+                      {isAdmin && selectedUser.id !== currentUserId && (
+                        <button 
+                          className="win98-button danger"
+                          onClick={() => handleDelete(selectedUser.id)}
+                          disabled={loading}
+                        >
+                          Delete
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button 
+                          className="win98-button primary"
+                          onClick={() => handleEdit(selectedUser)}
+                          disabled={loading}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="win98-section-title">Select a user to view details</div>
+                )
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './RestaurantPanel.css';
+import './Win98Panel.css';
 
 interface Restaurant {
   id: number;
@@ -223,187 +224,201 @@ const RestaurantPanel: React.FC<RestaurantPanelProps> = ({
   const selectedRestaurant = getSelectedRestaurant();
 
   return (
-    <div className="restaurant-panel-overlay">
-      <div className="restaurant-panel">
-        <h2>Restaurant Management</h2>
-        
-        {error && <div className="error-message">{error}</div>}
-        
-        <div className="panel-layout">
-          <div className="restaurant-list-container">
-            <h3>Restaurants</h3>
-            {loading && restaurants.length === 0 ? (
-              <p>Loading restaurants...</p>
-            ) : restaurants.length === 0 ? (
-              <p>No restaurants found.</p>
-            ) : (
-              <div className="restaurant-list">
-                {restaurants.map(restaurant => (
-                  <div 
-                    key={restaurant.id} 
-                    className={`restaurant-item ${selectedRestaurantId === restaurant.id ? 'selected-restaurant' : ''}`}
-                    onClick={() => handleSelectRestaurant(restaurant)}
-                  >
-                    <span>{restaurant.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!editMode ? (
-              <button 
-                className="add-button" 
-                onClick={handleAddNewClick}
-                disabled={loading}
-              >
-                Add New Restaurant
-              </button>
-            ) : null}
-          </div>
-
-          <div className="restaurant-details">
-            {editMode ? (
-              <>
-                <h3>{editingId ? 'Edit Restaurant' : 'Add New Restaurant'}</h3>
-                <form onSubmit={handleSubmit}>
-                  <div className="form-group">
-                    <label htmlFor="name">Name:</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="description">Description:</label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="address">Address:</label>
-                    <input
-                      type="text"
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="phone">Phone:</label>
-                    <input
-                      type="text"
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="website">Website:</label>
-                    <input
-                      type="text"
-                      id="website"
-                      name="website"
-                      value={formData.website}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div className="button-group">
-                    <button type="submit" disabled={loading}>
-                      {editingId ? 'Update' : 'Add'} Restaurant
-                    </button>
-                    {editingId && (
-                      <button 
-                        type="button" 
-                        onClick={() => handleDelete(editingId)}
-                        className="delete-button"
-                        disabled={loading}
-                      >
-                        Delete Restaurant
-                      </button>
-                    )}
-                    <button 
-                      type="button" 
-                      onClick={handleCancelEdit}
-                      className="cancel-button"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </>
-            ) : (
-              selectedRestaurant ? (
-                <>
-                  <h3>Restaurant Details</h3>
-                  <div className="restaurant-info">
-                    <div className="info-row">
-                      <span>Name:</span>
-                      <span>{selectedRestaurant.name}</span>
-                    </div>
-                    {selectedRestaurant.description && (
-                      <div className="info-row">
-                        <span>Description:</span>
-                        <span>{selectedRestaurant.description}</span>
-                      </div>
-                    )}
-                    {selectedRestaurant.address && (
-                      <div className="info-row">
-                        <span>Address:</span>
-                        <span>{selectedRestaurant.address}</span>
-                      </div>
-                    )}
-                    {selectedRestaurant.phone && (
-                      <div className="info-row">
-                        <span>Phone:</span>
-                        <span>{selectedRestaurant.phone}</span>
-                      </div>
-                    )}
-                    {selectedRestaurant.website && (
-                      <div className="info-row">
-                        <span>Website:</span>
-                        <span>{selectedRestaurant.website}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="restaurant-actions">
-                    <button 
-                      onClick={() => handleEdit(selectedRestaurant)}
-                      disabled={loading}
-                      className="edit-button"
-                    >
-                      Edit Restaurant
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(selectedRestaurant.id)}
-                      disabled={loading}
-                      className="delete-button"
-                    >
-                      Delete Restaurant
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p>Select a restaurant to view details</p>
-              )
-            )}
-          </div>
+    <div className="win98-panel-overlay">
+      <div className="win98-panel">
+        <div className="win98-panel-header">
+          <div className="win98-panel-title">Restaurant Management</div>
+          <button className="win98-panel-close" onClick={onClose}>×</button>
         </div>
         
-        <button className="close-button" onClick={onClose}>Close</button>
+        <div className="win98-panel-content">
+          {error && <div className="win98-status error">{error}</div>}
+          
+          <div className="win98-split-panel">
+            <div className="win98-panel-left">
+              <div className="win98-section-title">Restaurants</div>
+              <div className="win98-list">
+                {loading && restaurants.length === 0 ? (
+                  <div className="win98-list-item">Loading restaurants...</div>
+                ) : restaurants.length === 0 ? (
+                  <div className="win98-list-item">No restaurants found.</div>
+                ) : (
+                  restaurants.map(restaurant => (
+                    <div 
+                      key={restaurant.id} 
+                      className={`win98-list-item ${selectedRestaurantId === restaurant.id ? 'selected' : ''}`}
+                      onClick={() => handleSelectRestaurant(restaurant)}
+                    >
+                      {restaurant.name}
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              {!editMode && (
+                <button 
+                  className="win98-button"
+                  onClick={handleAddNewClick}
+                  disabled={loading}
+                >
+                  Add New Restaurant
+                </button>
+              )}
+            </div>
+
+            <div className="win98-panel-right">
+              {editMode ? (
+                <div className="win98-panel-section">
+                  <div className="win98-section-title">
+                    {editingId ? 'Edit Restaurant' : 'Add New Restaurant'}
+                  </div>
+                  <form onSubmit={handleSubmit}>
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="name">Name:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="description">Description:</label>
+                      <textarea
+                        className="win98-textarea"
+                        id="description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="address">Address:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="phone">Phone:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="phone"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-form-row">
+                      <label className="win98-label" htmlFor="website">Website:</label>
+                      <input
+                        className="win98-input"
+                        type="text"
+                        id="website"
+                        name="website"
+                        value={formData.website}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div className="win98-panel-footer">
+                      <button 
+                        type="button" 
+                        className="win98-button"
+                        onClick={handleCancelEdit}
+                      >
+                        Cancel
+                      </button>
+                      {editingId && (
+                        <button 
+                          type="button" 
+                          className="win98-button danger"
+                          onClick={() => handleDelete(editingId)}
+                          disabled={loading}
+                        >
+                          Delete
+                        </button>
+                      )}
+                      <button 
+                        type="submit" 
+                        className="win98-button primary"
+                        disabled={loading}
+                      >
+                        {editingId ? 'Update' : 'Add'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                selectedRestaurant ? (
+                  <div className="win98-panel-section">
+                    <div className="win98-section-title">Restaurant Details</div>
+                    <div className="win98-fieldset">
+                      <div className="win98-form-row">
+                        <span className="win98-label">Name:</span>
+                        <span>{selectedRestaurant.name}</span>
+                      </div>
+                      {selectedRestaurant.description && (
+                        <div className="win98-form-row">
+                          <span className="win98-label">Description:</span>
+                          <span>{selectedRestaurant.description}</span>
+                        </div>
+                      )}
+                      {selectedRestaurant.address && (
+                        <div className="win98-form-row">
+                          <span className="win98-label">Address:</span>
+                          <span>{selectedRestaurant.address}</span>
+                        </div>
+                      )}
+                      {selectedRestaurant.phone && (
+                        <div className="win98-form-row">
+                          <span className="win98-label">Phone:</span>
+                          <span>{selectedRestaurant.phone}</span>
+                        </div>
+                      )}
+                      {selectedRestaurant.website && (
+                        <div className="win98-form-row">
+                          <span className="win98-label">Website:</span>
+                          <span>{selectedRestaurant.website}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="win98-panel-footer">
+                      <button 
+                        className="win98-button danger"
+                        onClick={() => handleDelete(selectedRestaurant.id)}
+                        disabled={loading}
+                      >
+                        Delete
+                      </button>
+                      <button 
+                        className="win98-button primary"
+                        onClick={() => handleEdit(selectedRestaurant)}
+                        disabled={loading}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="win98-section-title">Select a restaurant to view details</div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

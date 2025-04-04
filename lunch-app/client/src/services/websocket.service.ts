@@ -147,9 +147,12 @@ class WebSocketService {
     
     // Return a function to remove this listener
     return () => {
-      const index = this.messageListeners[type].indexOf(callback);
-      if (index !== -1) {
-        this.messageListeners[type].splice(index, 1);
+      // Check if the type and callback still exist before trying to find its index
+      if (this.messageListeners && this.messageListeners[type]) {
+        const index = this.messageListeners[type].indexOf(callback);
+        if (index !== -1) {
+          this.messageListeners[type].splice(index, 1);
+        }
       }
     };
   }
