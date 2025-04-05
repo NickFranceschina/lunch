@@ -16,6 +16,7 @@ const mockFetchFailure = (errorMessage: string) => {
   (global.fetch as jest.Mock).mockResolvedValueOnce({
     ok: false,
     statusText: errorMessage,
+    json: async () => ({ message: errorMessage }),
   });
 };
 
@@ -59,7 +60,7 @@ describe('API Services', () => {
       it('should throw an error when login fails', async () => {
         mockFetchFailure('Invalid credentials');
 
-        await expect(authService.login('testuser', 'wrongpassword')).rejects.toThrow('Login failed');
+        await expect(authService.login('testuser', 'wrongpassword')).rejects.toThrow('Invalid credentials');
       });
     });
 

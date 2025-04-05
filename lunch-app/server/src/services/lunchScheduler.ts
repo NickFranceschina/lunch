@@ -5,10 +5,11 @@ import { User } from '../models/User';
 import { Restaurant } from '../models/Restaurant';
 import { GroupRestaurant } from '../models/GroupRestaurant';
 
-// Time when lunch voting should be triggered (11:45 AM)
-const LUNCH_TIME_HOUR = 11;
-const LUNCH_TIME_MINUTE = 45;
+// Default lunch notification time (if not specified in group)
+const DEFAULT_LUNCH_TIME_HOUR = 11;
+const DEFAULT_LUNCH_TIME_MINUTE = 45;
 
+// The cron job will run every minute to check all groups
 let lunchTimeJob: CronJob | null = null;
 
 /**
@@ -20,16 +21,16 @@ export function initLunchScheduler(): void {
     lunchTimeJob.stop();
   }
 
-  // Create a new cron job to run at 11:45 AM every weekday
-  // The first digit (seconds) is set to 0 to ensure it runs exactly at the top of the minute
+  // Create a new cron job to run every minute on weekdays
+  // We'll check all groups inside the job and trigger notifications based on their individual timezones
   lunchTimeJob = new CronJob(
-    `0 ${LUNCH_TIME_MINUTE} ${LUNCH_TIME_HOUR} * * 1-5`, // Seconds, Minutes, Hours, Day of month, Month, Day of week (1-5 = Monday-Friday)
+    `0 * * * * 1-5`, // Run every minute, Monday-Friday
     async function() {
-      console.log(`Lunch time check triggered by scheduler at ${new Date().toLocaleString()}`);
+      console.log(`Lunch time check triggered at ${new Date().toLocaleString()}`);
       
       if (global.socketIOServer) {
         try {
-          await lunchTimeCheck(global.socketIOServer);
+          await checkAllGroupLunchTimes(global.socketIOServer);
         } catch (error) {
           console.error('Error in scheduled lunch time check:', error);
         }
@@ -39,7 +40,7 @@ export function initLunchScheduler(): void {
     },
     null, // onComplete
     false, // don't start automatically - we'll start it aligned to the global minute
-    'America/New_York' // timezone
+    'UTC' // Use UTC as base timezone; we'll convert for each group
   );
 
   // Calculate the delay until the next minute starts (at :00 seconds)
@@ -55,21 +56,96 @@ export function initLunchScheduler(): void {
 }
 
 /**
- * Perform the lunch time check and trigger restaurant selection
+ * Check if it's lunch time for any groups based on their timezones
  */
-export async function lunchTimeCheck(socketIOServer: any): Promise<void> {
+async function checkAllGroupLunchTimes(socketIOServer: any): Promise<void> {
+  try {
+    console.log('Checking lunch times for all groups...');
+    
+    // Get the current UTC time
+    const nowUtc = new Date();
+    
+    // Get all groups with their notification times and timezones
+    const groupRepository = AppDataSource.getRepository(Group);
+    const groups = await groupRepository.find();
+    
+    for (const group of groups) {
+      if (!group.notificationTime) {
+        continue; // Skip groups without notification time
+      }
+      
+      // Get the group's notification time hours and minutes
+      let notificationHour: number;
+      let notificationMinute: number;
+      
+      // Parse notification time based on its format
+      if (typeof group.notificationTime === 'string') {
+        // If it's a string like "12:30:00"
+        const timeParts = (group.notificationTime as string).split(':');
+        notificationHour = parseInt(timeParts[0], 10);
+        notificationMinute = parseInt(timeParts[1], 10);
+      } else if (group.notificationTime instanceof Date) {
+        // If it's a Date object
+        notificationHour = group.notificationTime.getHours();
+        notificationMinute = group.notificationTime.getMinutes();
+      } else {
+        // If it's stored in an unexpected format, try to convert it
+        try {
+          const dateObj = new Date(group.notificationTime as any);
+          notificationHour = dateObj.getHours();
+          notificationMinute = dateObj.getMinutes();
+        } catch (error) {
+          console.error(`Error parsing notification time for group ${group.name}:`, error);
+          continue; // Skip this group if we can't parse the time
+        }
+      }
+      
+      // Get the group's timezone or use UTC as fallback
+      const timezone = group.timezone || 'UTC';
+      
+      // Get current time in UTC hours/minutes
+      const nowUtcHours = nowUtc.getUTCHours();
+      const nowUtcMinutes = nowUtc.getUTCMinutes();
+      
+      // Convert notification time to UTC based on timezone offset
+      // (This is simplified - you'd need to calculate the actual offset for the timezone)
+      const timezoneOffsetHours = -6; // For your -6 timezone
+      const notificationTimeUTCHours = (notificationHour - timezoneOffsetHours + 24) % 24;
+      
+      // Then compare
+      if (nowUtcHours === notificationTimeUTCHours && nowUtcMinutes === notificationMinute) {
+        console.log(`It's lunch time for group "${group.name}"! Selecting restaurant...`);
+        await lunchTimeCheck(socketIOServer, group.id);
+      }
+    }
+  } catch (error) {
+    console.error('Error checking group lunch times:', error);
+  }
+}
+
+/**
+ * Perform the lunch time check and trigger restaurant selection for a specific group
+ */
+export async function lunchTimeCheck(socketIOServer: any, groupId?: number): Promise<void> {
   try {
     if (!socketIOServer) {
       console.error('No socketIOServer provided to lunchTimeCheck');
       return;
     }
 
-    console.log('Running lunch time check...');
+    console.log(`Running lunch time check for group ID: ${groupId || 'all'}`);
     const groupRepository = AppDataSource.getRepository(Group);
-    // Get all groups - no isActive property in Group
-    const activeGroups = await groupRepository.find();
+    
+    // Get all groups or a specific group
+    let groups: Group[];
+    if (groupId) {
+      const group = await groupRepository.findOne({ where: { id: groupId } });
+      groups = group ? [group] : [];
+    } else {
+      groups = await groupRepository.find();
+    }
 
-    for (const group of activeGroups) {
+    for (const group of groups) {
       console.log(`Processing lunch time for group: ${group.name} (ID: ${group.id})`);
       
       try {

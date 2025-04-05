@@ -12,12 +12,12 @@ export const authService = {
       body: JSON.stringify({ username, password }),
     });
     
-    const data = await response.json();
-    
     if (!response.ok) {
-      throw new Error(data.message || 'Login failed');
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Login failed');
     }
     
+    const data = await response.json();
     return data;
   },
   
