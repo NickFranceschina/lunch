@@ -7,7 +7,11 @@ import {
   deleteRestaurant,
   getRandomRestaurant,
   voteForRestaurant,
-  getCurrentRestaurant
+  getCurrentRestaurant,
+  getGroupRestaurants,
+  addRestaurantToGroup,
+  updateGroupRestaurant,
+  removeRestaurantFromGroup
 } from '../controllers/restaurant.controller';
 import { authenticateToken, isAdmin } from '../middleware/auth.middleware';
 
@@ -21,6 +25,12 @@ router.use('/group/:groupId', groupRouter);
 groupRouter.get('/random', authenticateToken, getRandomRestaurant);
 groupRouter.get('/current', authenticateToken, getCurrentRestaurant);
 groupRouter.post('/vote', authenticateToken, voteForRestaurant);
+
+// Group restaurant relationship management routes
+groupRouter.get('/relationships', authenticateToken, getGroupRestaurants);
+groupRouter.post('/relationships', authenticateToken, isAdmin, addRestaurantToGroup);
+groupRouter.put('/relationships/:restaurantId', authenticateToken, isAdmin, updateGroupRestaurant);
+groupRouter.delete('/relationships/:restaurantId', authenticateToken, isAdmin, removeRestaurantFromGroup);
 
 /**
  * BASIC CRUD ROUTES

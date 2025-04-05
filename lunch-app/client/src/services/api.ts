@@ -172,6 +172,73 @@ export const restaurantService = {
     }
     
     return response.json();
+  },
+  
+  // Group Restaurant Relationship Management
+  getGroupRestaurants: async (groupId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/relationships`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get group restaurant relationships');
+    }
+    
+    return response.json();
+  },
+  
+  addRestaurantToGroup: async (groupId: number, restaurantId: number, occurrenceRating: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/relationships`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ restaurantId, occurrenceRating }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add restaurant to group');
+    }
+    
+    return response.json();
+  },
+  
+  updateGroupRestaurant: async (groupId: number, restaurantId: number, occurrenceRating: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/relationships/${restaurantId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ occurrenceRating }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update restaurant occurrence');
+    }
+    
+    return response.json();
+  },
+  
+  removeRestaurantFromGroup: async (groupId: number, restaurantId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/restaurants/group/${groupId}/relationships/${restaurantId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to remove restaurant from group');
+    }
+    
+    return response.json();
   }
 };
 

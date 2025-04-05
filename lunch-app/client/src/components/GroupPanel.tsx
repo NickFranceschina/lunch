@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { groupService, userService, systemService } from '../services/api';
+import { groupService, userService, systemService, restaurantService } from '../services/api';
 import './GroupPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
@@ -64,9 +64,15 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   });
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'members'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'members' | 'restaurants'>('details');
   const [hasChanges, setHasChanges] = useState<boolean>(false);
   const [serverTimezone, setServerTimezone] = useState<{ name?: string; offsetString?: string; shortOffset: string } | null>(null);
+  
+  // Restaurant management state
+  const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
+  const [groupRestaurants, setGroupRestaurants] = useState<any[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
+  const [occurrenceRating, setOccurrenceRating] = useState<string>('sometimes');
   
   // Use position in the center of the screen
   const initialPosition = {
@@ -82,6 +88,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       fetchGroups();
       fetchAllUsers(); // Fetch all users for adding
       fetchServerTimezone(); // Fetch server timezone
+      fetchAllRestaurants(); // Fetch all restaurants
     }
   }, [isVisible]);
 
@@ -133,6 +140,36 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       }
     } catch (err) {
       console.error('Error fetching server timezone:', err);
+    }
+  };
+
+  // Fetch all restaurants
+  const fetchAllRestaurants = async () => {
+    try {
+      setLoading(true);
+      const response = await restaurantService.getAllRestaurants(token);
+      if (!response.success) { throw new Error(response.message); }
+      setAllRestaurants(response.restaurants || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch restaurants');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch restaurants for the selected group
+  const fetchGroupRestaurants = async (groupId: number) => {
+    try {
+      setLoading(true);
+      const response = await restaurantService.getGroupRestaurants(groupId, token);
+      if (!response.success) { throw new Error(response.message); }
+      setGroupRestaurants(response.data || []);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch group restaurants');
+      console.error('Failed to fetch group restaurants:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -227,6 +264,9 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     setShowUserSelector(false);
     setShowAddForm(false);
     setHasChanges(false);
+    
+    // Fetch group restaurants when a group is selected
+    fetchGroupRestaurants(group.id);
   };
 
   // Handle form submission for new/updated group
@@ -434,6 +474,82 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     setShowAddForm(false);
   };
 
+  // Handle restaurant selection change
+  const handleRestaurantSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedRestaurant(parseInt(e.target.value));
+  };
+
+  // Handle occurrence rating change
+  const handleOccurrenceRatingChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setOccurrenceRating(e.target.value);
+  };
+
+  // Add a restaurant to the group
+  const handleAddRestaurantToGroup = async () => {
+    if (!selectedGroup || !selectedRestaurant) return;
+    
+    try {
+      setLoading(true);
+      await restaurantService.addRestaurantToGroup(
+        selectedGroup.id, 
+        selectedRestaurant, 
+        occurrenceRating,
+        token
+      );
+      await fetchGroupRestaurants(selectedGroup.id); // Refresh group restaurants
+      setSelectedRestaurant(null);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to add restaurant to group. Please try again.');
+      console.error('Failed to add restaurant to group:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update a restaurant's occurrence rating
+  const handleUpdateGroupRestaurant = async (restaurantId: number, newOccurrenceRating: string) => {
+    if (!selectedGroup) return;
+    
+    try {
+      setLoading(true);
+      await restaurantService.updateGroupRestaurant(
+        selectedGroup.id, 
+        restaurantId, 
+        newOccurrenceRating,
+        token
+      );
+      await fetchGroupRestaurants(selectedGroup.id); // Refresh group restaurants
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update restaurant occurrence rating. Please try again.');
+      console.error('Failed to update restaurant occurrence rating:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Remove a restaurant from the group
+  const handleRemoveRestaurantFromGroup = async (restaurantId: number) => {
+    if (!selectedGroup) return;
+    
+    if (!window.confirm('Are you sure you want to remove this restaurant from the group?')) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await restaurantService.removeRestaurantFromGroup(selectedGroup.id, restaurantId, token);
+      await fetchGroupRestaurants(selectedGroup.id); // Refresh group restaurants
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove restaurant from group. Please try again.');
+      console.error('Failed to remove restaurant from group:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -576,6 +692,12 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                       onClick={() => setActiveTab('members')}
                     >
                       Members
+                    </div>
+                    <div 
+                      className={`win98-tab ${activeTab === 'restaurants' ? 'active' : ''}`} 
+                      onClick={() => setActiveTab('restaurants')}
+                    >
+                      Restaurants
                     </div>
                   </div>
                   
@@ -897,6 +1019,155 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                               </button>
                             )
                           )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {activeTab === 'restaurants' && (
+                    <>
+                      {isAdmin ? (
+                        <div className="win98-panel-section">
+                          {/* Simplified single-column layout */}
+                          <div className="win98-fieldset" style={{ marginBottom: '10px', position: 'relative', paddingTop: '10px' }}>
+                            <div className="win98-fieldset-title" style={{ position: 'absolute', top: '-8px', left: '10px', background: '#c0c0c0', padding: '0 4px', fontSize: '11px' }}>
+                              Add Restaurant
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                              <select
+                                className="win98-select"
+                                id="restaurant"
+                                value={selectedRestaurant || ''}
+                                onChange={handleRestaurantSelect}
+                                style={{ flex: 2 }}
+                              >
+                                <option value="">-- Select Restaurant --</option>
+                                {allRestaurants
+                                  .filter(r => !groupRestaurants.some(gr => gr.id === r.id))
+                                  .map(restaurant => (
+                                    <option key={restaurant.id} value={restaurant.id}>
+                                      {restaurant.name}
+                                    </option>
+                                  ))}
+                              </select>
+                              
+                              <select
+                                className="win98-select"
+                                id="occurrence"
+                                value={occurrenceRating}
+                                onChange={handleOccurrenceRatingChange}
+                                style={{ flex: 1 }}
+                              >
+                                <option value="seldom">Seldom</option>
+                                <option value="sometimes">Sometimes</option>
+                                <option value="often">Often</option>
+                              </select>
+                              
+                              <button
+                                className="win98-button"
+                                onClick={handleAddRestaurantToGroup}
+                                disabled={loading || !selectedRestaurant}
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="win98-fieldset" style={{ position: 'relative', paddingTop: '10px' }}>
+                            <div className="win98-fieldset-title" style={{ position: 'absolute', top: '-8px', left: '10px', background: '#c0c0c0', padding: '0 4px', fontSize: '11px' }}>
+                              Group Restaurants
+                            </div>
+                            <div style={{ height: "190px", overflowY: "auto" }}>
+                              <table className="win98-table" style={{ width: "100%" }}>
+                                <thead style={{ position: 'sticky', top: 0, background: '#c0c0c0', zIndex: 1 }}>
+                                  <tr>
+                                    <th>Restaurant</th>
+                                    <th style={{ width: "90px" }}>Occurrence</th>
+                                    <th style={{ width: "60px" }}>Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {loading && groupRestaurants.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={3}>Loading restaurants...</td>
+                                    </tr>
+                                  ) : groupRestaurants.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={3}>No restaurants found in this group.</td>
+                                    </tr>
+                                  ) : (
+                                    groupRestaurants.map(restaurant => (
+                                      <tr key={restaurant.id}>
+                                        <td>{restaurant.name}</td>
+                                        <td>
+                                          <select 
+                                            className="win98-select"
+                                            value={restaurant.occurrenceRating}
+                                            onChange={(e) => handleUpdateGroupRestaurant(restaurant.id, e.target.value)}
+                                            style={{ width: "100%" }}
+                                          >
+                                            <option value="seldom">Seldom</option>
+                                            <option value="sometimes">Sometimes</option>
+                                            <option value="often">Often</option>
+                                          </select>
+                                        </td>
+                                        <td>
+                                          <button
+                                            className="win98-button danger small"
+                                            onClick={() => handleRemoveRestaurantFromGroup(restaurant.id)}
+                                            disabled={loading}
+                                            style={{ width: "100%" }}
+                                          >
+                                            Remove
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="win98-panel-section">
+                          <div className="win98-fieldset" style={{ position: 'relative', paddingTop: '10px' }}>
+                            <div className="win98-fieldset-title" style={{ position: 'absolute', top: '-8px', left: '10px', background: '#c0c0c0', padding: '0 4px', fontSize: '11px' }}>
+                              Group Restaurants
+                            </div>
+                            <div style={{ height: "220px", overflowY: "auto" }}>
+                              <table className="win98-table" style={{ width: "100%" }}>
+                                <thead style={{ position: 'sticky', top: 0, background: '#c0c0c0', zIndex: 1 }}>
+                                  <tr>
+                                    <th>Restaurant</th>
+                                    <th style={{ width: "100px" }}>Occurrence</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {loading && groupRestaurants.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={2}>Loading restaurants...</td>
+                                    </tr>
+                                  ) : groupRestaurants.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={2}>No restaurants found in this group.</td>
+                                    </tr>
+                                  ) : (
+                                    groupRestaurants.map(restaurant => (
+                                      <tr key={restaurant.id}>
+                                        <td>{restaurant.name}</td>
+                                        <td>
+                                          {restaurant.occurrenceRating === 'seldom' && 'Seldom'}
+                                          {restaurant.occurrenceRating === 'sometimes' && 'Sometimes'}
+                                          {restaurant.occurrenceRating === 'often' && 'Often'}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </>

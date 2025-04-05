@@ -417,4 +417,237 @@ export const getCurrentRestaurant = async (req: AuthRequest, res: Response) => {
       message: 'Error retrieving current restaurant'
     });
   }
+};
+
+/**
+ * Get all restaurants for a specific group with their occurrence ratings
+ */
+export const getGroupRestaurants = async (req: AuthRequest, res: Response) => {
+  try {
+    const { groupId } = req.params;
+    
+    // Verify the group exists
+    const group = await groupRepository.findOne({
+      where: { id: parseInt(groupId) }
+    });
+    
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+    
+    // Get all restaurants for this group with their occurrence ratings
+    const groupRestaurants = await groupRestaurantRepository.find({
+      where: { groupId: parseInt(groupId) },
+      relations: ['restaurant']
+    });
+    
+    // Format the result
+    const result = groupRestaurants.map(gr => ({
+      id: gr.restaurant.id,
+      name: gr.restaurant.name,
+      description: gr.restaurant.description,
+      address: gr.restaurant.address,
+      phone: gr.restaurant.phone,
+      website: gr.restaurant.website,
+      occurrenceRating: gr.occurrenceRating
+    }));
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting group restaurants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving group restaurants'
+    });
+  }
+};
+
+/**
+ * Add a restaurant to a group with an occurrence rating
+ */
+export const addRestaurantToGroup = async (req: AuthRequest, res: Response) => {
+  try {
+    const { groupId } = req.params;
+    const { restaurantId, occurrenceRating } = req.body;
+    
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant ID is required'
+      });
+    }
+    
+    // Verify the group exists
+    const group = await groupRepository.findOne({
+      where: { id: parseInt(groupId) }
+    });
+    
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+    
+    // Verify the restaurant exists
+    const restaurant = await restaurantRepository.findOne({
+      where: { id: parseInt(restaurantId) }
+    });
+    
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant not found'
+      });
+    }
+    
+    // Check if relationship already exists
+    const existingRelationship = await groupRestaurantRepository.findOne({
+      where: {
+        groupId: parseInt(groupId),
+        restaurantId: parseInt(restaurantId)
+      }
+    });
+    
+    if (existingRelationship) {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant is already in this group'
+      });
+    }
+    
+    // Create the relationship
+    const validOccurrenceRating = Object.values(OccurrenceRating).includes(occurrenceRating as OccurrenceRating)
+      ? occurrenceRating as OccurrenceRating
+      : OccurrenceRating.SOMETIMES;
+    
+    const groupRestaurant = groupRestaurantRepository.create({
+      group,
+      restaurant,
+      occurrenceRating: validOccurrenceRating
+    });
+    
+    await groupRestaurantRepository.save(groupRestaurant);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Restaurant added to group successfully',
+      data: {
+        id: restaurant.id,
+        name: restaurant.name,
+        occurrenceRating: groupRestaurant.occurrenceRating
+      }
+    });
+  } catch (error) {
+    console.error('Error adding restaurant to group:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error adding restaurant to group'
+    });
+  }
+};
+
+/**
+ * Update a restaurant's occurrence rating in a group
+ */
+export const updateGroupRestaurant = async (req: AuthRequest, res: Response) => {
+  try {
+    const { groupId, restaurantId } = req.params;
+    const { occurrenceRating } = req.body;
+    
+    if (!occurrenceRating) {
+      return res.status(400).json({
+        success: false,
+        message: 'Occurrence rating is required'
+      });
+    }
+    
+    // Verify the rating is valid
+    if (!Object.values(OccurrenceRating).includes(occurrenceRating as OccurrenceRating)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid occurrence rating'
+      });
+    }
+    
+    // Find the relationship
+    const groupRestaurant = await groupRestaurantRepository.findOne({
+      where: {
+        groupId: parseInt(groupId),
+        restaurantId: parseInt(restaurantId)
+      },
+      relations: ['restaurant']
+    });
+    
+    if (!groupRestaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant is not in this group'
+      });
+    }
+    
+    // Update the relationship
+    groupRestaurant.occurrenceRating = occurrenceRating as OccurrenceRating;
+    await groupRestaurantRepository.save(groupRestaurant);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Restaurant occurrence rating updated successfully',
+      data: {
+        id: groupRestaurant.restaurant.id,
+        name: groupRestaurant.restaurant.name,
+        occurrenceRating: groupRestaurant.occurrenceRating
+      }
+    });
+  } catch (error) {
+    console.error('Error updating restaurant occurrence rating:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating restaurant occurrence rating'
+    });
+  }
+};
+
+/**
+ * Remove a restaurant from a group
+ */
+export const removeRestaurantFromGroup = async (req: AuthRequest, res: Response) => {
+  try {
+    const { groupId, restaurantId } = req.params;
+    
+    // Find the relationship
+    const groupRestaurant = await groupRestaurantRepository.findOne({
+      where: {
+        groupId: parseInt(groupId),
+        restaurantId: parseInt(restaurantId)
+      }
+    });
+    
+    if (!groupRestaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant is not in this group'
+      });
+    }
+    
+    // Remove the relationship
+    await groupRestaurantRepository.remove(groupRestaurant);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Restaurant removed from group successfully'
+    });
+  } catch (error) {
+    console.error('Error removing restaurant from group:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error removing restaurant from group'
+    });
+  }
 }; 
