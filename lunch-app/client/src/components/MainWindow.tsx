@@ -61,6 +61,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const [showGroupChat, setShowGroupChat] = useState<boolean>(initialGroupChatVisible);
   const [chatWithUser, setChatWithUser] = useState<User | null>(null);
   const [groupChatData, setGroupChatData] = useState<Group | null>(null);
+  const [pendingGroupMessage, setPendingGroupMessage] = useState<any>(null);
 
   // Use draggable hook
   // Set skipCentering to true and pass our own initial position for the window
@@ -104,7 +105,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     sessionStorage.removeItem('chat_user_id');
   };
 
-  const handleStartGroupChat = async () => {
+  const handleStartGroupChat = async (initialMessage?: any) => {
     if (!currentGroup) {
       console.error('Cannot start group chat: No current group selected');
       showStatusMessage('Unable to start group chat: No group selected', 3000);
@@ -144,6 +145,11 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       
       console.log('Loaded group data for chat:', groupData);
       
+      // Store the pending message if provided
+      if (initialMessage) {
+        setPendingGroupMessage(initialMessage);
+      }
+      
       setGroupChatData(groupData);
       setShowGroupChat(true);
     } catch (error) {
@@ -155,6 +161,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const handleCloseGroupChat = () => {
     setShowGroupChat(false);
     setGroupChatData(null);
+    setPendingGroupMessage(null);
   };
 
   // Show status message with auto-hide after delay
@@ -360,10 +367,10 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
           // Listen for group messages to auto-open chat window
           const groupMessageListener = socketIOService.addMessageListener('group_message', (data) => {
             console.log('Received group message in MainWindow:', data);
-            // If group chat isn't already open, open it
+            // If group chat isn't already open, open it with the triggering message
             if (!showGroupChat && data && data.groupId === currentGroup) {
-              console.log('Auto-opening group chat window for incoming message');
-              handleStartGroupChat();
+              console.log('Auto-opening group chat window for incoming message:', data);
+              handleStartGroupChat(data);
             }
           });
           
@@ -979,9 +986,10 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       )}
       
       {showGroupChat && groupChatData && (
-        <GroupChat
-          group={groupChatData}
+        <GroupChat 
+          group={groupChatData} 
           onClose={handleCloseGroupChat}
+          initialMessage={pendingGroupMessage}
         />
       )}
     </div>

@@ -9,6 +9,7 @@ import { socketIOService } from '../services/socketio.service';
 interface GroupChatProps {
   group: Group;
   onClose: () => void;
+  initialMessage?: any;
 }
 
 interface ChatMessage {
@@ -20,13 +21,14 @@ interface ChatMessage {
   groupId: number;
 }
 
-const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
+const GroupChat: React.FC<GroupChatProps> = ({ group, onClose, initialMessage }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSocketConnected, setIsSocketConnected] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { authState } = useAuth();
   const { isConnected } = useWebSocket();
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -66,6 +68,36 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
       setCurrentUserId(authState.user.id);
     }
   }, [authState]);
+
+  // Process the initial message if provided
+  useEffect(() => {
+    if (initialMessage && !isLoading) {
+      // Add a slight delay to ensure other initialization is complete
+      setTimeout(() => {
+        const messageId = initialMessage.messageId || 
+          `${initialMessage.senderId || initialMessage.userId}-${initialMessage.message}-${initialMessage.timestamp}`;
+        
+        // Only process if not already seen
+        if (!processedMessagesRef.current.has(messageId)) {
+          console.log('Processing initial message:', initialMessage);
+          
+          // Add to processed messages set
+          processedMessagesRef.current.add(messageId);
+          
+          // Create message object and add to state
+          const message: ChatMessage = {
+            message: initialMessage.message,
+            senderId: Number(initialMessage.userId || initialMessage.senderId || 0),
+            senderName: determineCorrectSenderName(initialMessage),
+            timestamp: initialMessage.timestamp || new Date().toISOString(),
+            groupId: initialMessage.groupId || group.id
+          };
+          
+          setMessages(prevMessages => [...prevMessages, message]);
+        }
+      }, 300);
+    }
+  }, [initialMessage, isLoading, group.id]);
 
   // Initialize component
   useEffect(() => {
@@ -107,6 +139,11 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
     
     // Add connection listener
     const removeListener = socketIOService.addConnectionListener(connectionListener);
+    
+    // Focus on the input field when the component mounts
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
     
     // Clean up on unmount
     return () => {
@@ -373,6 +410,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ group, onClose }) => {
       
       <form className="message-input-form" onSubmit={handleSendMessage}>
         <input
+          ref={inputRef}
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
