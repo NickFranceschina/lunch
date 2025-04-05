@@ -36,4 +36,26 @@
 
 .desktop-icon:active .icon-image {
   transform: scale(0.95);
+}
+
+.context-menu {
+  position: fixed;
+  background-color: #c0c0c0;
+  border: 2px outset #ffffff;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  z-index: 9999;
+  padding: 2px;
+  font-family: "MS Sans Serif", Arial, sans-serif;
+  font-size: 12px;
+}
+
+.context-menu-item {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  background-color: #000080;
+  color: white;
 } 

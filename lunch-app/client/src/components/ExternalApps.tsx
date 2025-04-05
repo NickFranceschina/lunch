@@ -36,6 +36,7 @@ const ExternalApps: React.FC = () => {
           position={app.position}
           icon={<div dangerouslySetInnerHTML={{ __html: app.icon }} />}
           onClick={() => toggleWindowVisibility(app.id)}
+          url={app.url}
         />
       ))}
 
