@@ -42,6 +42,10 @@ lunch.db
 lunch-app/server/lunch.db 
 # Ignore db file in docker volume mount point
 lunch-app/database/lunch.db 
+# Ignore development and production database files
+lunch-app/database/lunch-dev.db
+lunch-app/database/lunch-prod.db
+*.db
 *.sqlite
 *.sqlite3
 
