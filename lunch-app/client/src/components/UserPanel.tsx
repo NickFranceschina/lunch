@@ -654,7 +654,13 @@ const UserPanel: React.FC<UserPanelProps> = ({
                         {onStartChat && selectedUser.isLoggedIn && (
                           <button 
                             className="win98-button"
-                            onClick={handleChatWithUser}
+                            disabled={true}
+                            title="Chat feature coming soon"
+                            style={{ 
+                              opacity: 0.7, 
+                              cursor: 'not-allowed',
+                              position: 'relative'
+                            }}
                           >
                             Chat
                           </button>

@@ -932,10 +932,24 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
               {isLoggedIn && (
                 <>
                   <div className="menu-item">
-                    <button className="menu-button">Chat</button>
+                    <button 
+                      className="menu-button" 
+                    >
+                      Chat
+                    </button>
                     <div className="dropdown-content">
-                      <button onClick={handleStartGroupChat}>Group Chat</button>
-                      <button onClick={handleUserPanelToggle}>User Chat</button>
+                      <button 
+                        onClick={handleStartGroupChat}
+                      >
+                        Group Chat
+                      </button>
+                      <button 
+                        style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                        title="User chat feature coming soon"
+                        disabled
+                      >
+                        User Chat
+                      </button>
                     </div>
                   </div>
                   
