@@ -460,15 +460,29 @@ class SocketIOServer {
     // Clear any existing timer
     if (this.lunchTimeChecker) {
       clearInterval(this.lunchTimeChecker);
+      this.lunchTimeChecker = null;
     }
     
     console.log('Starting lunch time checker');
     
-    // Check lunch times every minute
-    this.lunchTimeChecker = setInterval(() => {
+    // First, calculate the delay until the next minute starts (at :00 seconds)
+    const now = new Date();
+    const delayMs = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    
+    // Wait until the start of the next minute to begin our interval
+    setTimeout(() => {
+      console.log(`Lunch time checker aligned with global minute starting at ${new Date().toLocaleString()}`);
+      
+      // Run an initial check
       this.checkGroupLunchTimes()
-        .catch(err => console.error('Error checking lunch times:', err));
-    }, 60000); // Run every minute
+        .catch(err => console.error('Error in initial lunch time check:', err));
+      
+      // Then set up the interval to run exactly every 60 seconds
+      this.lunchTimeChecker = setInterval(() => {
+        this.checkGroupLunchTimes()
+          .catch(err => console.error('Error checking lunch times:', err));
+      }, 60000); // Run every minute
+    }, delayMs);
   }
 
   /**
@@ -500,8 +514,9 @@ class SocketIOServer {
       const now = new Date();
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
+      const currentSecond = now.getSeconds();
       
-      console.log(`Checking lunch times at ${currentHour}:${currentMinute}`);
+      console.log(`Checking lunch times at ${currentHour}:${currentMinute}:${currentSecond}`);
       
       for (const group of groups) {
         try {

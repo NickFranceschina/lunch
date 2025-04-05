@@ -21,6 +21,7 @@ export function initLunchScheduler(): void {
   }
 
   // Create a new cron job to run at 11:45 AM every weekday
+  // The first digit (seconds) is set to 0 to ensure it runs exactly at the top of the minute
   lunchTimeJob = new CronJob(
     `0 ${LUNCH_TIME_MINUTE} ${LUNCH_TIME_HOUR} * * 1-5`, // Seconds, Minutes, Hours, Day of month, Month, Day of week (1-5 = Monday-Friday)
     async function() {
@@ -37,11 +38,20 @@ export function initLunchScheduler(): void {
       }
     },
     null, // onComplete
-    true, // start automatically
+    false, // don't start automatically - we'll start it aligned to the global minute
     'America/New_York' // timezone
   );
 
-  console.log(`Lunch scheduler initialized. Next run at: ${lunchTimeJob.nextDates()}`);
+  // Calculate the delay until the next minute starts (at :00 seconds)
+  const now = new Date();
+  const delayMs = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+  
+  // Start the cron job aligned with the global minute
+  setTimeout(() => {
+    console.log(`Starting lunch scheduler aligned with global minute at ${new Date().toLocaleString()}`);
+    lunchTimeJob?.start();
+    console.log(`Lunch scheduler initialized. Next run at: ${lunchTimeJob?.nextDates()}`);
+  }, delayMs);
 }
 
 /**
