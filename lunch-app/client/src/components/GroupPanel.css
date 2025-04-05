@@ -466,12 +466,16 @@
 .win98-form-row {
   margin-bottom: 10px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
 }
 
 .win98-form-row .win98-label {
-  margin-bottom: 5px;
-  font-weight: bold;
+  width: 120px;
+  text-align: right;
+  padding-right: 10px;
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .win98-form-row input,

@@ -52,24 +52,87 @@ interface Timezone {
 }
 
 const timezones: Timezone[] = [
-  { value: 'UTC', label: 'Coordinated Universal Time', offset: 'UTC+0' },
-  { value: 'America/New_York', label: 'Eastern Time (US & Canada)', offset: 'UTC-5' },
-  { value: 'America/Chicago', label: 'Central Time (US & Canada)', offset: 'UTC-6' },
-  { value: 'America/Denver', label: 'Mountain Time (US & Canada)', offset: 'UTC-7' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)', offset: 'UTC-8' },
-  { value: 'America/Anchorage', label: 'Alaska (US)', offset: 'UTC-9' },
+  // UTC-11 to UTC-1
+  { value: 'Pacific/Midway', label: 'Midway Island, Samoa', offset: 'UTC-11' },
   { value: 'Pacific/Honolulu', label: 'Hawaii (US)', offset: 'UTC-10' },
+  { value: 'America/Anchorage', label: 'Alaska (US)', offset: 'UTC-9' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)', offset: 'UTC-8' },
+  { value: 'America/Phoenix', label: 'Phoenix, Arizona', offset: 'UTC-7' },
+  { value: 'America/Denver', label: 'Mountain Time (US & Canada)', offset: 'UTC-7' },
+  { value: 'America/Chicago', label: 'Central Time (US & Canada)', offset: 'UTC-6' },
+  { value: 'America/New_York', label: 'Eastern Time (US & Canada)', offset: 'UTC-5' },
+  { value: 'America/Caracas', label: 'Caracas, Venezuela', offset: 'UTC-4' },
+  { value: 'America/Santiago', label: 'Santiago, Chile', offset: 'UTC-4' },
+  { value: 'America/St_Johns', label: 'St. John\'s, Newfoundland', offset: 'UTC-3:30' },
+  { value: 'America/Sao_Paulo', label: 'São Paulo, Brazil', offset: 'UTC-3' },
+  { value: 'Atlantic/Azores', label: 'Azores Islands', offset: 'UTC-1' },
+  { value: 'Atlantic/Cape_Verde', label: 'Cape Verde Islands', offset: 'UTC-1' },
+  
+  // UTC 0
+  { value: 'UTC', label: 'Coordinated Universal Time', offset: 'UTC+0' },
   { value: 'Europe/London', label: 'London, Dublin, Lisbon', offset: 'UTC+0' },
+  
+  // UTC+1 to UTC+14
   { value: 'Europe/Paris', label: 'Paris, Berlin, Rome, Madrid', offset: 'UTC+1' },
   { value: 'Europe/Helsinki', label: 'Helsinki, Kyiv, Riga, Sofia', offset: 'UTC+2' },
   { value: 'Europe/Moscow', label: 'Moscow, St. Petersburg', offset: 'UTC+3' },
+  { value: 'Asia/Tehran', label: 'Tehran, Iran', offset: 'UTC+3:30' },
   { value: 'Asia/Dubai', label: 'Dubai, Abu Dhabi', offset: 'UTC+4' },
+  { value: 'Asia/Kabul', label: 'Kabul, Afghanistan', offset: 'UTC+4:30' },
+  { value: 'Asia/Karachi', label: 'Karachi, Islamabad', offset: 'UTC+5' },
   { value: 'Asia/Kolkata', label: 'Mumbai, New Delhi', offset: 'UTC+5:30' },
+  { value: 'Asia/Kathmandu', label: 'Kathmandu, Nepal', offset: 'UTC+5:45' },
+  { value: 'Asia/Dhaka', label: 'Dhaka, Bangladesh', offset: 'UTC+6' },
+  { value: 'Asia/Yangon', label: 'Yangon, Myanmar', offset: 'UTC+6:30' },
+  { value: 'Asia/Bangkok', label: 'Bangkok, Hanoi, Jakarta', offset: 'UTC+7' },
   { value: 'Asia/Shanghai', label: 'Beijing, Shanghai, Singapore', offset: 'UTC+8' },
+  { value: 'Australia/Perth', label: 'Perth, Western Australia', offset: 'UTC+8' },
+  { value: 'Asia/Pyongyang', label: 'Pyongyang, North Korea', offset: 'UTC+8:30' },
   { value: 'Asia/Tokyo', label: 'Tokyo, Seoul, Osaka', offset: 'UTC+9' },
+  { value: 'Australia/Adelaide', label: 'Adelaide, South Australia', offset: 'UTC+9:30' },
   { value: 'Australia/Sydney', label: 'Sydney, Melbourne', offset: 'UTC+10' },
+  { value: 'Australia/Lord_Howe', label: 'Lord Howe Island', offset: 'UTC+10:30' },
+  { value: 'Pacific/Noumea', label: 'Noumea, New Caledonia', offset: 'UTC+11' },
   { value: 'Pacific/Auckland', label: 'Auckland, Wellington', offset: 'UTC+12' },
+  { value: 'Pacific/Fiji', label: 'Fiji Islands', offset: 'UTC+12' },
+  { value: 'Pacific/Tongatapu', label: 'Nuku\'alofa, Tonga', offset: 'UTC+13' },
+  { value: 'Pacific/Kiritimati', label: 'Kiritimati Island', offset: 'UTC+14' },
 ];
+
+// Add a utility function to get the browser timezone from Intl API
+const getBrowserTimezone = (): string => {
+  try {
+    // Try to get the timezone from Intl API
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // If the timezone is in our list, use it
+    if (timezones.some(tz => tz.value === timeZone)) {
+      return timeZone;
+    }
+    // Otherwise, try to find a matching timezone by offset
+    const now = new Date();
+    const browserOffset = -now.getTimezoneOffset() / 60; // Convert minutes to hours and flip sign
+    
+    // Format the offset as UTC+X or UTC-X
+    const offsetString = browserOffset >= 0 
+      ? `UTC+${browserOffset}` 
+      : `UTC${browserOffset}`;
+    
+    // Find a timezone with matching offset
+    const matchingTimezone = timezones.find(tz => tz.offset === offsetString);
+    if (matchingTimezone) {
+      return matchingTimezone.value;
+    }
+    
+    // Default to UTC if no match found
+    return 'UTC';
+  } catch (e) {
+    console.error('Error determining browser timezone:', e);
+    return 'UTC'; // Fallback to UTC
+  }
+};
+
+// Get the default timezone once when component is initialized
+const defaultTimezone = getBrowserTimezone();
 
 const GroupPanel: React.FC<GroupPanelProps> = ({
   isVisible,
@@ -90,7 +153,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     name: '',
     description: '',
     notificationTime: '12:00', // Default time
-    timezone: 'UTC' // Default timezone
+    timezone: defaultTimezone // Use browser timezone instead of hardcoded UTC
   });
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
@@ -316,12 +379,30 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       const response = await apiCall;
       if (!response.success) { throw new Error(response.message); }
       
-      await fetchGroups(); // Refresh the group list
-      // If creating, select the new group
-      if (!isUpdating && response.data) {
-        selectGroup(response.data);
+      // If updating an existing group, refresh and reset form
+      if (isUpdating) {
+        await fetchGroups();
+        resetForm();
+      } 
+      // If creating a new group, we need to get complete data and select it
+      else if (response.data) {
+        // Get the complete group data with users, etc.
+        const groupDetailsResponse = await groupService.getGroupById(response.data.id, token);
+        
+        if (groupDetailsResponse.success) {
+          // Refresh the groups list
+          const newGroups = await groupService.getAllGroups(token);
+          if (newGroups.success) {
+            setGroups(newGroups.data);
+          }
+          
+          // Select the new group with full details
+          selectGroup(groupDetailsResponse.data);
+          
+          // Explicitly exit add form mode
+          setShowAddForm(false);
+        }
       }
-      resetForm();
     } catch (err: any) {
       setError(err.message || `Failed to ${isUpdating ? 'update' : 'create'} group`);
     } finally {
@@ -447,7 +528,24 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     try {
       setLoading(true);
       await groupService.deleteGroup(groupId, token);
-      await fetchGroups();
+      
+      // Refresh the groups list
+      const response = await groupService.getAllGroups(token);
+      
+      if (response.success) {
+        setGroups(response.data);
+        
+        // Clear the selected group
+        setSelectedGroup(null);
+        
+        // Reset the form
+        resetForm();
+        
+        // If there are other groups, select the first one
+        if (response.data.length > 0) {
+          selectGroup(response.data[0]);
+        }
+      }
     } catch (err) {
       setError('Failed to delete group. Please try again.');
       console.error('Failed to delete group:', err);
@@ -483,7 +581,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       name: '',
       description: '',
       notificationTime: '12:00',
-      timezone: 'UTC'
+      timezone: defaultTimezone // Use browser timezone
     });
     setSelectedGroup(null);
     setShowAddForm(true);
@@ -504,7 +602,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       name: '',
       description: '',
       notificationTime: '12:00',
-      timezone: 'UTC'
+      timezone: defaultTimezone // Use browser timezone
     });
     setHasChanges(false);
     setShowAddForm(false);
