@@ -5,8 +5,7 @@ import Win98Taskbar from './components/Win98Taskbar';
 import HelpIcon from './components/HelpIcon';
 import HelpWindow from './components/HelpWindow';
 import GitHubIcon from './components/GitHubIcon';
-import UncornIcon from './components/UncornIcon';
-import UncornGame from './components/UncornGame';
+import ExternalApps from './components/ExternalApps';
 import { AuthProvider } from './services/AuthContext';
 import { WebSocketProvider } from './services/WebSocketContext';
 
@@ -14,10 +13,8 @@ function App() {
   // Read initial visibility state from sessionStorage, default to true if not found
   const initialVisibility = sessionStorage.getItem('window_visibility_main') === 'false' ? false : true;
   const initialHelpVisibility = sessionStorage.getItem('window_visibility_help') === 'true';
-  const initialUncornVisibility = sessionStorage.getItem('window_visibility_uncorn') === 'true';
   const [isMainWindowVisible, setIsMainWindowVisible] = useState<boolean>(initialVisibility);
   const [isHelpWindowVisible, setIsHelpWindowVisible] = useState<boolean>(initialHelpVisibility);
-  const [isUncornGameVisible, setIsUncornGameVisible] = useState<boolean>(initialUncornVisibility);
 
   // Save window visibility state to sessionStorage whenever it changes
   useEffect(() => {
@@ -27,10 +24,6 @@ function App() {
   useEffect(() => {
     sessionStorage.setItem('window_visibility_help', isHelpWindowVisible.toString());
   }, [isHelpWindowVisible]);
-  
-  useEffect(() => {
-    sessionStorage.setItem('window_visibility_uncorn', isUncornGameVisible.toString());
-  }, [isUncornGameVisible]);
 
   // Listen for lunch time events to show the window
   useEffect(() => {
@@ -103,10 +96,6 @@ function App() {
     setIsHelpWindowVisible(!isHelpWindowVisible);
   };
 
-  const toggleUncornGameVisibility = () => {
-    setIsUncornGameVisible(!isUncornGameVisible);
-  };
-
   return (
     <div className="App">
       <AuthProvider>
@@ -114,7 +103,7 @@ function App() {
           {/* Desktop Icons */}
           <HelpIcon onClick={toggleHelpWindowVisibility} />
           <GitHubIcon />
-          <UncornIcon onClick={toggleUncornGameVisibility} />
+          <ExternalApps />
           
           {/* Windows */}
           <MainWindow 
@@ -124,10 +113,6 @@ function App() {
           <HelpWindow 
             isVisible={isHelpWindowVisible}
             onClose={toggleHelpWindowVisibility}
-          />
-          <UncornGame
-            isVisible={isUncornGameVisible}
-            onClose={toggleUncornGameVisibility}
           />
           
           {/* Taskbar */}
