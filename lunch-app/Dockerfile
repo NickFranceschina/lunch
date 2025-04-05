@@ -35,8 +35,8 @@ RUN npm install --production
 COPY --from=server-build /app/dist ./dist
 COPY --from=client-build /app/client/build ./public
 
-# Create database directory
-RUN mkdir -p /app/database
+# Create database directory with proper permissions
+RUN mkdir -p /app/database && chown -R node:node /app/database
 
 # Fix permissions - ensure node user owns all app files
 RUN chown -R node:node /app
