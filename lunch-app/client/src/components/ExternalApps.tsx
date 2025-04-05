@@ -36,6 +36,25 @@ const ExternalApps: React.FC = () => {
     };
   }, []);
 
+  // Listen for shutdown_all_apps event
+  useEffect(() => {
+    const handleShutdownAllApps = () => {
+      console.log('Shutting down all external apps');
+      // Close all windows by setting all to false
+      const allClosed = Object.keys(visibleWindows).reduce((acc, id) => {
+        acc[id] = false;
+        return acc;
+      }, {} as Record<string, boolean>);
+      
+      setVisibleWindows(allClosed);
+    };
+
+    window.addEventListener('shutdown_all_apps', handleShutdownAllApps);
+    return () => {
+      window.removeEventListener('shutdown_all_apps', handleShutdownAllApps);
+    };
+  }, [visibleWindows]);
+
   const toggleWindowVisibility = (id: string) => {
     setVisibleWindows(prev => ({
       ...prev,

@@ -5,11 +5,13 @@ import externalApps from '../data/externalApps';
 interface Win98TaskbarProps {
   toggleMainWindowVisibility: () => void;
   toggleHelpWindowVisibility: () => void;
+  toggleShutdownDialog: () => void;
 }
 
 const Win98Taskbar: React.FC<Win98TaskbarProps> = ({ 
   toggleMainWindowVisibility,
-  toggleHelpWindowVisibility
+  toggleHelpWindowVisibility,
+  toggleShutdownDialog
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
@@ -214,7 +216,13 @@ const Win98Taskbar: React.FC<Win98TaskbarProps> = ({
               <div className="start-menu-separator"></div>
               
               {/* Shutdown option */}
-              <div className="start-menu-item shutdown-item">
+              <div 
+                className="start-menu-item shutdown-item"
+                onClick={() => {
+                  toggleShutdownDialog();
+                  setStartMenuOpen(false);
+                }}
+              >
                 <div className="start-menu-icon">
                   <svg width="16" height="16" viewBox="0 0 16 16">
                     <circle cx="8" cy="8" r="7" fill="#c0c0c0" stroke="#808080" />

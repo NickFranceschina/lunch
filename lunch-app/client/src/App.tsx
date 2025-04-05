@@ -7,6 +7,7 @@ import HelpWindow from './components/HelpWindow';
 import GitHubIcon from './components/GitHubIcon';
 import LunchShortcutIcon from './components/LunchShortcutIcon';
 import ExternalApps from './components/ExternalApps';
+import ShutdownDialog from './components/ShutdownDialog';
 import { AuthProvider } from './services/AuthContext';
 import { WebSocketProvider } from './services/WebSocketContext';
 
@@ -16,6 +17,7 @@ function App() {
   const initialHelpVisibility = sessionStorage.getItem('window_visibility_help') === 'true';
   const [isMainWindowVisible, setIsMainWindowVisible] = useState<boolean>(initialVisibility);
   const [isHelpWindowVisible, setIsHelpWindowVisible] = useState<boolean>(initialHelpVisibility);
+  const [isShutdownDialogVisible, setIsShutdownDialogVisible] = useState<boolean>(false);
 
   // Save window visibility state to sessionStorage whenever it changes
   useEffect(() => {
@@ -97,6 +99,26 @@ function App() {
     setIsHelpWindowVisible(!isHelpWindowVisible);
   };
 
+  const toggleShutdownDialog = () => {
+    setIsShutdownDialogVisible(!isShutdownDialogVisible);
+  };
+
+  const handleShutdown = () => {
+    // Close the shutdown dialog
+    setIsShutdownDialogVisible(false);
+    
+    // Remove all apps from view
+    setIsMainWindowVisible(false);
+    setIsHelpWindowVisible(false);
+    
+    // Close all external apps
+    const externalAppsEvent = new CustomEvent('shutdown_all_apps');
+    window.dispatchEvent(externalAppsEvent);
+    
+    // Clear session storage to start fresh on next load
+    sessionStorage.clear();
+  };
+
   return (
     <div className="App">
       <AuthProvider>
@@ -121,6 +143,14 @@ function App() {
           <Win98Taskbar 
             toggleMainWindowVisibility={toggleMainWindowVisibility}
             toggleHelpWindowVisibility={toggleHelpWindowVisibility}
+            toggleShutdownDialog={toggleShutdownDialog}
+          />
+          
+          {/* Shutdown Dialog */}
+          <ShutdownDialog
+            isVisible={isShutdownDialogVisible}
+            onCancel={toggleShutdownDialog}
+            onShutdown={handleShutdown}
           />
         </WebSocketProvider>
       </AuthProvider>
