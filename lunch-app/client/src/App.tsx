@@ -4,6 +4,7 @@ import MainWindow from './components/MainWindow';
 import Win98Taskbar from './components/Win98Taskbar';
 import HelpIcon from './components/HelpIcon';
 import HelpWindow from './components/HelpWindow';
+import GitHubIcon from './components/GitHubIcon';
 import { AuthProvider } from './services/AuthContext';
 import { WebSocketProvider } from './services/WebSocketContext';
 
@@ -53,6 +54,7 @@ function App() {
         <WebSocketProvider>
           {/* Desktop Icons */}
           <HelpIcon onClick={toggleHelpWindowVisibility} />
+          <GitHubIcon />
           
           {/* Windows */}
           <MainWindow 
