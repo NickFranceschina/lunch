@@ -5,6 +5,7 @@ import * as http from 'http';
 import dotenv from 'dotenv';
 import { Server } from 'socket.io';
 import { initSocketIOServer } from './config/socketio';
+import path from 'path';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -33,6 +34,9 @@ declare global {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static frontend files
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Set up routes
 app.use('/api/auth', authRoutes);
@@ -70,6 +74,11 @@ app.get('/health', (req: Request, res: Response) => {
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api-docs', express.static('./docs'));
 }
+
+// Catch-all route to serve the frontend for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
 
 // Start the server
 AppDataSource.initialize()
