@@ -12,11 +12,13 @@ export const authService = {
       body: JSON.stringify({ username, password }),
     });
     
+    const data = await response.json();
+    
     if (!response.ok) {
-      throw new Error('Login failed');
+      throw new Error(data.message || 'Login failed');
     }
     
-    return response.json();
+    return data;
   },
   
   logout: async (token: string) => {

@@ -7,9 +7,10 @@ interface LoginDialogProps {
   onLogin: (username: string, password: string) => void;
   onCancel: () => void;
   isVisible: boolean;
+  errorMessage?: string;
 }
 
-const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible }) => {
+const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible, errorMessage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
@@ -118,6 +119,9 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ onLogin, onCancel, isVisible 
               </button>
             </div>
           </form>
+        </div>
+        <div className={`win98-status-bar ${errorMessage ? 'error' : ''}`}>
+          {errorMessage || ''}
         </div>
       </div>
     </div>

@@ -83,6 +83,9 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   const [currentGroupName, setCurrentGroupName] = useState<string>('');
   const [currentGroupLunchTime, setCurrentGroupLunchTime] = useState<string>('');
 
+  // Add loginErrorMessage state to the list of useState declarations, near the top of the component
+  const [loginErrorMessage, setLoginErrorMessage] = useState<string | undefined>(undefined);
+
   // Handle toggle functions
   const handleRestaurantPanelToggle = () => {
     setShowRestaurantPanel(!showRestaurantPanel);
@@ -521,8 +524,12 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     setShowLoginDialog(true);
   };
 
+  // Update the login submit handler to capture error messages
   const handleLoginSubmit = async (username: string, password: string) => {
     try {
+      // Clear any previous error messages
+      setLoginErrorMessage(undefined);
+      
       // Trim username and password to prevent errors from whitespace
       const trimmedUsername = username.trim();
       const trimmedPassword = password.trim();
@@ -567,12 +574,15 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       showStatusMessage(`Welcome, ${response.user.username}!`);
     } catch (error) {
       console.error('Login failed:', error);
-      showStatusMessage('Login failed. Please check your credentials.', 5000);
+      // Set the error message from the error
+      setLoginErrorMessage(error instanceof Error ? error.message : 'Login failed. Please check your credentials.');
     }
   };
-
+  
+  // Update handleLoginCancel to also clear error messages
   const handleLoginCancel = () => {
     setShowLoginDialog(false);
+    setLoginErrorMessage(undefined);
   };
 
   // Handle logout
@@ -1169,6 +1179,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
         isVisible={showLoginDialog}
         onLogin={handleLoginSubmit}
         onCancel={handleLoginCancel}
+        errorMessage={loginErrorMessage}
       />
       
       {showRestaurantPanel && (
