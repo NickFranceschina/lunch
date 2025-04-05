@@ -172,6 +172,30 @@ export const updateGroup = async (req: AuthRequest, res: Response) => {
     // Save group
     await groupRepository.save(group);
 
+    // Import Socket.IO server and emit group update event
+    const { getSocketIOServer } = require('../config/socketio');
+    const socketIOServer = getSocketIOServer();
+    
+    if (socketIOServer) {
+      socketIOServer.broadcastToGroup(id, {
+        type: 'group_update',
+        data: {
+          groupId: id,
+          name: group.name,
+          description: group.description,
+          notificationTime: group.notificationTime
+        }
+      });
+      
+      // Also log what we're sending for debugging
+      console.log(`Emitting group_update for group ${id}:`, {
+        groupId: id,
+        name: group.name,
+        description: group.description,
+        notificationTime: group.notificationTime
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Group updated successfully',
@@ -532,6 +556,29 @@ export const updateGroupNotificationTime = async (req: Request, res: Response) =
       rawValue: savedGroup?.notificationTime,
       type: savedGroup?.notificationTime ? typeof savedGroup.notificationTime : 'undefined'
     });
+    
+    // Import Socket.IO server and emit group update event
+    const { getSocketIOServer } = require('../config/socketio');
+    const socketIOServer = getSocketIOServer();
+    
+    if (socketIOServer) {
+      socketIOServer.broadcastToGroup(parseInt(id), {
+        type: 'group_update',
+        data: {
+          groupId: parseInt(id),
+          name: group.name,
+          notificationTime: timeObj
+        }
+      });
+      
+      // Also log what we're sending for debugging
+      console.log(`Emitting group_update for group ${id} notification time:`, {
+        groupId: parseInt(id),
+        name: group.name,
+        notificationTime: timeObj,
+        notificationTimeStr: timeObj.toTimeString()
+      });
+    }
     
     res.status(200).json({ 
       message: 'Group notification time updated successfully',

@@ -179,6 +179,12 @@ class SocketIOService {
           this.triggerMessageListeners('notification', data);
         });
         
+        // Add explicit handler for group_update events
+        this.socket.on('group_update', (data) => {
+          console.log('Received group_update in socketio.service:', data);
+          this.triggerMessageListeners('group_update', data);
+        });
+        
         // Setup error event handler
         this.socket.on('error_message', (error) => {
           console.error('Server error:', error);

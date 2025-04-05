@@ -245,11 +245,22 @@ class SocketIOServer {
       data: message.data
     });
     
+    // Check if we have clients in the room before broadcasting
+    const room = this.io.sockets.adapter.rooms.get(`group:${groupId}`);
+    const oldFormatRoom = this.io.sockets.adapter.rooms.get(`group_${groupId}`);
+    
+    console.log(`Room for group:${groupId} has ${room ? room.size : 0} clients`);
+    console.log(`Old format room for group_${groupId} has ${oldFormatRoom ? oldFormatRoom.size : 0} clients`);
+    
     // Make sure we're emitting to the correct room format
+    // Emit directly to the rooms using the event type as the event name
     this.io.to(`group:${groupId}`).emit(message.type, message.data);
     
     // Also emit to the old format room for backward compatibility
     this.io.to(`group_${groupId}`).emit(message.type, message.data);
+    
+    // Also log that the event was sent
+    console.log(`Sent ${message.type} event to group:${groupId} with data:`, message.data);
   }
 
   /**

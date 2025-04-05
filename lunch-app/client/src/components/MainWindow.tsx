@@ -382,6 +382,67 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
             }
           });
           
+          // Listen for group updates (name, lunch time changes)
+          const groupUpdateListener = socketIOService.addMessageListener('group_update', (data) => {
+            console.log('Received group update in MainWindow:', data);
+            console.log('Current group ID for comparison:', currentGroup, 'type:', typeof currentGroup);
+            
+            // Extract data properly based on different possible formats
+            const eventData = data?.data || data; // Handle both {data: {...}} and direct object format
+            
+            console.log('Extracted event data:', eventData);
+            console.log('Received group ID:', eventData?.groupId, 'type:', typeof eventData?.groupId);
+            
+            // Ensure we're comparing the same type (number to number)
+            const receivedGroupId = typeof eventData?.groupId === 'string' ? parseInt(eventData.groupId, 10) : eventData?.groupId;
+            
+            if (eventData && receivedGroupId === currentGroup) {
+              console.log('Group update matches current group, updating UI...');
+              // Update group information when it changes
+              if (eventData.name) {
+                console.log('Setting group name to:', eventData.name);
+                setCurrentGroupName(eventData.name);
+              }
+              
+              if (eventData.notificationTime) {
+                console.log('Processing notification time:', eventData.notificationTime);
+                let lunchTime = '';
+                try {
+                  // Handle different possible formats
+                  if (typeof eventData.notificationTime === 'string') {
+                    // Parse time string (e.g. "12:30:00")
+                    const timeParts = eventData.notificationTime.split(':');
+                    const hours = parseInt(timeParts[0], 10);
+                    const minutes = parseInt(timeParts[1], 10);
+                    lunchTime = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+                  } else if (typeof eventData.notificationTime === 'object') {
+                    // Handle ISO string format or date object
+                    const dateStr = eventData.notificationTime instanceof Date 
+                      ? eventData.notificationTime.toISOString()
+                      : (typeof eventData.notificationTime === 'string' 
+                        ? eventData.notificationTime 
+                        : JSON.stringify(eventData.notificationTime));
+                    
+                    console.log('Notification time parsed as:', dateStr);
+                    const date = new Date(dateStr);
+                    const hours = date.getHours();
+                    const minutes = date.getMinutes();
+                    lunchTime = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+                  }
+                  console.log('Formatted lunch time:', lunchTime);
+                } catch (e) {
+                  console.error('Error parsing lunch time:', e);
+                  lunchTime = 'TBD';
+                }
+                setCurrentGroupLunchTime(lunchTime);
+              }
+              
+              showStatusMessage(`Group details updated: ${eventData.name || currentGroupName}`);
+            } else {
+              console.log('Group update does not match current group or data is invalid');
+            }
+          });
+          
           // Return a cleanup function to remove all listeners
           return () => {
             restaurantListener();
@@ -390,6 +451,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
             voteListener();
             notificationListener();
             groupMessageListener();
+            groupUpdateListener();
           };
         };
         
