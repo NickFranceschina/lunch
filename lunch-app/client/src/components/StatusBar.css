@@ -21,6 +21,12 @@
   flex: 1;
 }
 
+.status-right {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
 .status-separator {
   width: 1px;
   height: 16px;
@@ -33,6 +39,17 @@
   padding-right: 2px;
   white-space: nowrap;
   font-weight: normal;
+}
+
+.status-group {
+  padding: 1px 5px;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #000;
+  background-color: #e6e6e6;
+  border: 1px inset #f5f5f5;
+  border-top-color: #808080;
+  border-left-color: #808080;
 }
 
 @keyframes fadeIn {

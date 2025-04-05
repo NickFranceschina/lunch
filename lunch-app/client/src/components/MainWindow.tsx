@@ -79,6 +79,10 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   // Track active/foreground window
   const [activeWindow, setActiveWindow] = useState<string>('');
 
+  // Add new state variables for group info
+  const [currentGroupName, setCurrentGroupName] = useState<string>('');
+  const [currentGroupLunchTime, setCurrentGroupLunchTime] = useState<string>('');
+
   // Handle toggle functions
   const handleRestaurantPanelToggle = () => {
     setShowRestaurantPanel(!showRestaurantPanel);
@@ -463,7 +467,8 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       
       const response = await authService.login(trimmedUsername, trimmedPassword);
       setIsLoggedIn(true);
-      setCurrentUser(trimmedUsername);
+      // Use username from server response instead of input to preserve capitalization
+      setCurrentUser(response.user.username);
       setCurrentUserId(response.user.id);
       setToken(response.token);
       setIsAdmin(response.user.isAdmin);
@@ -478,7 +483,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       // Save token and user data to sessionStorage for reconnection
       sessionStorage.setItem('token', response.token);
       sessionStorage.setItem('userId', response.user.id.toString());
-      sessionStorage.setItem('username', trimmedUsername);
+      sessionStorage.setItem('username', response.user.username);
       sessionStorage.setItem('isAdmin', response.user.isAdmin.toString());
       if (response.user.currentGroupId) {
         sessionStorage.setItem('groupId', response.user.currentGroupId.toString());
@@ -497,7 +502,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       }
       
       setShowLoginDialog(false);
-      showStatusMessage(`Welcome, ${trimmedUsername}!`);
+      showStatusMessage(`Welcome, ${response.user.username}!`);
     } catch (error) {
       console.error('Login failed:', error);
       showStatusMessage('Login failed. Please check your credentials.', 5000);
@@ -538,6 +543,8 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       setCurrentUser('');
       setCurrentUserId(0);
       setCurrentGroup(null);
+      setCurrentGroupName('');
+      setCurrentGroupLunchTime('');
       setRestaurantName('');
       setConfirmed(false);
       setToken('');
@@ -554,7 +561,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       // Clear all window positions
       clearAllWindowPositions();
       
-      // Clear all window visibility states
+      // Clear all window visibility settings
       clearAllWindowVisibility();
       
       showStatusMessage('You have been logged out');
@@ -598,6 +605,14 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     keys.forEach(key => {
       sessionStorage.removeItem(key);
     });
+    
+    // Reset window state
+    setShowLoginDialog(false);
+    setShowRestaurantPanel(false);
+    setShowUserPanel(false);
+    setShowGroupPanel(false);
+    setShowUserChat(false);
+    setShowGroupChat(false);
     
     console.log(`Cleared ${keys.length} saved window visibility states`);
   };
@@ -889,6 +904,52 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     }
   }, [isLoggedIn]);
 
+  // Modified effect to fetch group details when currentGroup changes
+  useEffect(() => {
+    if (isLoggedIn && token && currentGroup) {
+      // Fetch the group details to get name and lunch time
+      groupService.getGroupById(currentGroup, token)
+        .then((response: any) => {
+          if (response.success && response.data) {
+            setCurrentGroupName(response.data.name || '');
+            
+            // Format lunch time from notification time
+            if (response.data.notificationTime) {
+              let lunchTime = '';
+              try {
+                // Handle different possible formats
+                if (typeof response.data.notificationTime === 'string') {
+                  // Parse time string (e.g. "12:30:00")
+                  const timeParts = response.data.notificationTime.split(':');
+                  const hours = parseInt(timeParts[0], 10);
+                  const minutes = parseInt(timeParts[1], 10);
+                  lunchTime = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+                } else if (response.data.notificationTime instanceof Date) {
+                  const date = new Date(response.data.notificationTime);
+                  const hours = date.getHours();
+                  const minutes = date.getMinutes();
+                  lunchTime = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+                }
+              } catch (e) {
+                console.error('Error parsing lunch time:', e);
+                lunchTime = 'TBD';
+              }
+              setCurrentGroupLunchTime(lunchTime);
+            } else {
+              setCurrentGroupLunchTime('TBD');
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Error fetching group details:', error);
+        });
+    } else {
+      // Reset group info if not logged in or no group
+      setCurrentGroupName('');
+      setCurrentGroupLunchTime('');
+    }
+  }, [isLoggedIn, token, currentGroup]);
+
   return isVisible && isInitialized ? (
     <div className="main-window-container">
       <div
@@ -1037,6 +1098,8 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
           } 
           isVisible={showStatus || isLoggedIn}
           username={currentUser}
+          groupName={currentGroupName}
+          lunchTime={currentGroupLunchTime}
         />
       </div>
       
