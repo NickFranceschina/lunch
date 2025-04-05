@@ -210,7 +210,8 @@ async function announceRestaurantSelection(
         website: restaurant.website
       },
       timestamp: new Date().toISOString(),
-      message: `Today we're having lunch at ${restaurant.name}!`
+      message: `Today we're having lunch at ${restaurant.name}!`,
+      isScheduledEvent: true // Flag to indicate this came from the scheduler
     };
     
     // Emit to the group room

@@ -486,6 +486,16 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
         sessionStorage.setItem('groupId', response.user.groups[0].id.toString());
       }
       
+      // Request notification permission after login
+      if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        try {
+          const permission = await Notification.requestPermission();
+          console.log('Notification permission after login:', permission);
+        } catch (error) {
+          console.error('Error requesting notification permission:', error);
+        }
+      }
+      
       setShowLoginDialog(false);
       showStatusMessage(`Welcome, ${trimmedUsername}!`);
     } catch (error) {
@@ -828,8 +838,16 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
         setConfirmed(event.detail.isConfirmed);
       }
       
-      // Show notification in status bar
-      showStatusMessage(`Lunch selected: ${event.detail.restaurant.name}!`, 5000);
+      // Check if this is a scheduled event or manual selection
+      const isScheduledEvent = event.detail.isScheduledEvent === true;
+      
+      if (isScheduledEvent) {
+        // Show a more prominent notification for scheduled events
+        showStatusMessage(`🔔 LUNCH TIME! Today's selection: ${event.detail.restaurant.name}! 🔔`, 10000);
+      } else {
+        // Regular status message for manual selections
+        showStatusMessage(`Restaurant selected: ${event.detail.restaurant.name}`, 5000);
+      }
     };
     
     // Add event listener

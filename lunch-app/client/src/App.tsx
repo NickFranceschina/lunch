@@ -35,9 +35,35 @@ function App() {
         // Focus the window if the browser allows it
         window.focus();
         
-        // Play a notification sound if available
-        const notificationSound = new Audio('/sounds/notification.mp3');
-        notificationSound.play().catch(e => console.log('Could not play notification sound', e));
+        // Only play sound if this is a scheduled event
+        const isScheduledEvent = event.detail?.isScheduledEvent === true;
+        
+        if (isScheduledEvent) {
+          // Play a notification sound if available
+          const notificationSound = new Audio('/sounds/notification.mp3');
+          notificationSound.volume = 0.3; // Reduced volume (was 1.0)
+          notificationSound.loop = false;
+          
+          // Preload the sound
+          notificationSound.preload = 'auto';
+          
+          // Once loaded, play it
+          notificationSound.oncanplaythrough = () => {
+            const playPromise = notificationSound.play();
+            if (playPromise) {
+              playPromise.catch(e => {
+                console.error('Could not play notification sound:', e);
+                // Try again with user interaction if autoplay was blocked
+                document.addEventListener('click', () => {
+                  notificationSound.play().catch(e => console.error('Failed to play sound even after user interaction:', e));
+                }, { once: true });
+              });
+            }
+          };
+          
+          // Also try an immediate play in case it's already loaded
+          notificationSound.play().catch(e => console.log('Initial sound play failed:', e));
+        }
         
         // Explicitly ensure restaurant panel doesn't show
         // Dispatch an event that MainWindow will listen for

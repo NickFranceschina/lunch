@@ -145,6 +145,7 @@ class SocketIOService {
         // Add listeners for restaurant selections and votes
         this.socket.on('restaurant_selection', (data) => {
           console.log('Received restaurant selection:', data);
+          console.log('isScheduledEvent flag:', data.isScheduledEvent);
           // Show notification popup
           this.showRestaurantNotification(data);
           this.triggerMessageListeners('restaurant_selection', data);
@@ -152,6 +153,7 @@ class SocketIOService {
 
         this.socket.on('restaurant', (data) => {
           console.log('Received restaurant event:', data);
+          console.log('isScheduledEvent flag:', data.isScheduledEvent);
           // Show notification popup
           this.showRestaurantNotification(data);
           // Also trigger restaurant_selection listeners with this data
@@ -160,6 +162,7 @@ class SocketIOService {
 
         this.socket.on('random', (data) => {
           console.log('Received random event:', data);
+          console.log('isScheduledEvent flag:', data.isScheduledEvent);
           // Show notification popup
           this.showRestaurantNotification(data);
           // Also trigger restaurant_selection listeners with this data
@@ -359,37 +362,100 @@ class SocketIOService {
    */
   private showRestaurantNotification(data: any): void {
     if (!data || !data.restaurant) {
+      console.error('Invalid restaurant data received:', data);
       return;
     }
+
+    console.log('showRestaurantNotification called with data:', JSON.stringify(data));
 
     // Ensure the restaurant panel doesn't automatically open
     sessionStorage.setItem('window_visibility_restaurant', 'false');
     
-    // Dispatch a custom event that the app can listen for
+    // Always dispatch the restaurant_notification event for updating the UI
     const event = new CustomEvent('restaurant_notification', { 
       detail: data 
     });
     window.dispatchEvent(event);
     
-    // Dispatch a lunch:time event to make the main window pop up
-    const lunchTimeEvent = new CustomEvent('lunch:time', {
-      detail: { 
-        timestamp: new Date().toISOString(),
-        restaurant: data.restaurant
-      }
-    });
-    window.dispatchEvent(lunchTimeEvent);
+    // Only show window popup, play sounds and show browser notifications for scheduled events
+    // Check both data.isScheduledEvent and data.data.isScheduledEvent to handle different message formats
+    const isScheduledEvent = data.isScheduledEvent === true || 
+                           (data.data && data.data.isScheduledEvent === true);
     
-    // If browser notifications are supported and permitted, show one
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const title = 'Lunch Time!';
-      const options = {
-        body: `Today's lunch: ${data.restaurant.name}`,
-        icon: '/favicon.ico',
-        tag: 'lunch-notification'
+    console.log('isScheduledEvent value:', isScheduledEvent);
+    console.log('data.isScheduledEvent raw value:', data.isScheduledEvent);
+    console.log('data.data?.isScheduledEvent raw value:', data.data?.isScheduledEvent);
+    
+    if (isScheduledEvent) {
+      console.log('This is a scheduled lunch event - showing notifications');
+      
+      // Dispatch a lunch:time event to make the main window pop up
+      const lunchTimeEvent = new CustomEvent('lunch:time', {
+        detail: { 
+          timestamp: new Date().toISOString(),
+          restaurant: data.restaurant,
+          isScheduledEvent: true
+        }
+      });
+      window.dispatchEvent(lunchTimeEvent);
+      
+      // If browser notifications are supported, request permission if needed and show notification
+      if ('Notification' in window) {
+        // Check if permission is already granted
+        if (Notification.permission === 'granted') {
+          this.createBrowserNotification(data);
+        } 
+        // If permission hasn't been denied, request it
+        else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              this.createBrowserNotification(data);
+            }
+          });
+        }
+      }
+    } else {
+      console.log('This is a manual restaurant selection - not showing notifications');
+    }
+  }
+  
+  /**
+   * Create and display a browser notification
+   * @param data Restaurant data
+   */
+  private createBrowserNotification(data: any): void {
+    try {
+      const restaurantName = data.restaurant?.name || 'Unknown Restaurant';
+      const title = '🍽️ Lunch Time!';
+      
+      // Better notification options - using any type to avoid TypeScript errors with non-standard properties
+      const options: any = {
+        body: `Today's lunch selection: ${restaurantName}`,
+        icon: '/favicon.ico', // Use app favicon
+        badge: '/favicon.ico',
+        tag: 'lunch-notification',
+        requireInteraction: true, // Keep notification visible until user interacts with it
+        // vibrate is supported in some browsers for mobile devices
+        vibrate: [200, 100, 200]
       };
       
-      new Notification(title, options);
+      // Create and show the notification
+      const notification = new Notification(title, options);
+      
+      // Handle notification click
+      notification.onclick = () => {
+        // Focus the window when notification is clicked
+        window.focus();
+        notification.close();
+      };
+      
+      // Auto-close after 1 minute to avoid notification pile-up
+      setTimeout(() => {
+        notification.close();
+      }, 60000);
+      
+    } catch (error) {
+      console.error('Error creating browser notification:', error);
     }
   }
 }

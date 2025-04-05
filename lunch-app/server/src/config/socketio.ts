@@ -240,7 +240,16 @@ class SocketIOServer {
    * Broadcast a message to a specific group
    */
   broadcastToGroup(groupId: number, message: any) {
+    console.log(`Broadcasting to group:${groupId}:`, {
+      type: message.type,
+      data: message.data
+    });
+    
+    // Make sure we're emitting to the correct room format
     this.io.to(`group:${groupId}`).emit(message.type, message.data);
+    
+    // Also emit to the old format room for backward compatibility
+    this.io.to(`group_${groupId}`).emit(message.type, message.data);
   }
 
   /**
@@ -259,14 +268,28 @@ class SocketIOServer {
   /**
    * Send restaurant selection to a group
    */
-  sendRestaurantSelection(groupId: number, restaurantName: string, confirmed: boolean) {
+  sendRestaurantSelection(groupId: number, restaurantName: string, confirmed: boolean, isScheduledEvent: boolean = false) {
+    // Create payload with the scheduled flag
+    const payload = {
+      restaurant: restaurantName,
+      confirmed,
+      timestamp: new Date().toISOString(),
+      isScheduledEvent: isScheduledEvent
+    };
+    
+    // Log detailed information
+    console.log('SENDING RESTAURANT SELECTION:', {
+      groupId,
+      restaurantName,
+      confirmed,
+      isScheduledEvent,
+      timestamp: new Date().toISOString(),
+      fullPayload: payload
+    });
+    
     this.broadcastToGroup(groupId, {
       type: 'restaurant_selection',
-      data: {
-        restaurant: restaurantName,
-        confirmed,
-        timestamp: new Date().toISOString()
-      }
+      data: payload
     });
   }
 
@@ -322,7 +345,7 @@ class SocketIOServer {
   /**
    * Process a new random restaurant request for a group
    */
-  async processNewRandomRequest(groupId: number): Promise<void> {
+  async processNewRandomRequest(groupId: number, isScheduledEvent: boolean = false): Promise<void> {
     try {
       // Get the group
       const group = await groupRepository.findOne({ 
@@ -364,7 +387,8 @@ class SocketIOServer {
       this.sendRestaurantSelection(
         groupId,
         selectedRestaurant.name,
-        false // Not confirmed initially
+        false,
+        isScheduledEvent
       );
       
       console.log(`Selected random restaurant for group ${groupId}: ${selectedRestaurant.name}`);
@@ -553,7 +577,7 @@ class SocketIOServer {
           
           if (notificationHour === currentHour && notificationMinute === currentMinute) {
             console.log(`It's lunch time for group ${group.name}!`);
-            await this.processNewRandomRequest(group.id);
+            await this.processNewRandomRequest(group.id, true);
           }
         } catch (error) {
           console.error(`Error checking lunch time for group ${group.id}:`, error);
