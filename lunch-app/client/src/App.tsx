@@ -5,6 +5,7 @@ import Win98Taskbar from './components/Win98Taskbar';
 import HelpIcon from './components/HelpIcon';
 import HelpWindow from './components/HelpWindow';
 import GitHubIcon from './components/GitHubIcon';
+import LunchShortcutIcon from './components/LunchShortcutIcon';
 import ExternalApps from './components/ExternalApps';
 import { AuthProvider } from './services/AuthContext';
 import { WebSocketProvider } from './services/WebSocketContext';
@@ -103,6 +104,7 @@ function App() {
           {/* Desktop Icons */}
           <HelpIcon onClick={toggleHelpWindowVisibility} />
           <GitHubIcon />
+          <LunchShortcutIcon onClick={toggleMainWindowVisibility} />
           <ExternalApps />
           
           {/* Windows */}
