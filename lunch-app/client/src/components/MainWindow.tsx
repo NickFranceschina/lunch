@@ -10,7 +10,8 @@ import StatusBar from './StatusBar';
 import UserChat from './UserChat';
 import GroupChat from './GroupChat';
 import { authService, restaurantService, userService, groupService } from '../services/api';
-import { websocketService } from '../services/websocket.service';
+import { socketIOService } from '../services/socketio.service';
+import { useWebSocket } from '../services/WebSocketContext';
 import { User } from '../types/User';
 import { Group } from '../types/Group';
 import useDraggable from '../hooks/useDraggable';
@@ -70,6 +71,9 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   };
   const { position, containerRef, dragHandleRef, resetPosition } = useDraggable('main-window', initialPosition, true);
 
+  // Get the WebSocketContext
+  const { isConnected, sendMessage, addMessageListener } = useWebSocket();
+
   // Handle toggle functions
   const handleRestaurantPanelToggle = () => {
     setShowRestaurantPanel(!showRestaurantPanel);
@@ -109,14 +113,13 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     
     console.log('Starting group chat for group ID:', currentGroup);
     
-    // Ensure WebSocket connection is active before opening chat
-    if (!websocketService.isConnected() && token) {
-      console.log('MainWindow - Ensuring WebSocket connection before opening chat');
+    // Use the WebSocketContext to check connection status
+    if (!isConnected && token) {
+      console.log('MainWindow - Ensuring Socket.IO connection before opening chat');
       try {
-        await websocketService.connect(token);
-        setWsConnected(websocketService.isConnected());
+        await socketIOService.connect(token);
       } catch (error) {
-        console.error('MainWindow - Failed to connect WebSocket before chat:', error);
+        console.error('MainWindow - Failed to connect Socket.IO before chat:', error);
         // Continue anyway, the GroupChat will try to reconnect
       }
     }
@@ -141,7 +144,6 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       
       console.log('Loaded group data for chat:', groupData);
       
-      // Don't disconnect WebSocket when opening chat
       setGroupChatData(groupData);
       setShowGroupChat(true);
     } catch (error) {
@@ -169,249 +171,210 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     return () => clearTimeout(timer);
   };
 
-  // Connect to WebSocket when logged in
+  // Connect to Socket.IO when logged in
   useEffect(() => {
     let cleanupFunction: (() => void) | undefined;
     let pingInterval: NodeJS.Timeout | undefined;
     
     if (isLoggedIn && token) {
-      console.log("MainWindow - Attempting WebSocket connection with token:", token.substring(0, 10) + "...");
+      console.log("MainWindow - Attempting Socket.IO connection with token:", token.substring(0, 10) + "...");
       
-      // Clean up any existing message listeners before reconnecting
-      websocketService.clearMessageListeners('restaurant_selection');
-      websocketService.clearMessageListeners('vote_update');
-      websocketService.clearMessageListeners('notification');
-      websocketService.clearMessageListeners('chat_message');
-      
-      // Connect to WebSocket
-      websocketService.connect(token)
-        .then(() => {
-          setWsConnected(true);
-          console.log('MainWindow - WebSocket connected successfully');
-          showStatusMessage('Connected to server');
-          
-          // Fetch current restaurant and vote counts if user is part of a group
-          if (currentGroup) {
-            // First, check if there's an active restaurant selection
-            try {
-              console.log('Fetching current restaurant selection for group:', currentGroup);
-              restaurantService.getCurrentRestaurant(currentGroup, token)
-                .then((response: { 
-                  restaurant: { name: string },
-                  isConfirmed: boolean,
-                  yesVotes: number,
-                  noVotes: number,
-                  activeUsers: number
-                }) => {
-                  if (response.restaurant) {
-                    console.log('Current restaurant selection:', response.restaurant);
-                    setRestaurantName(response.restaurant.name);
-                    setConfirmed(response.isConfirmed);
-                    setYesVotes(response.yesVotes || 0);
-                    setNoVotes(response.noVotes || 0);
-                    
-                    // Set total users with fallback to a reasonable number 
-                    // (at least 3 users in a group or the sum of current votes)
-                    const minUserCount = Math.max(3, (response.yesVotes || 0) + (response.noVotes || 0));
-                    setTotalUsers(response.activeUsers || minUserCount);
-                    
-                    // Don't set hasVoted to true here, so the new user can still vote
-                  }
-                })
-                .catch((error: Error) => {
-                  console.error('Failed to fetch current restaurant:', error);
-                  // Non-critical error, don't show to user
-                });
-              
-              // We can't fetch users in group directly, so we use a fallback approach
-              // Assume at least 3 people in the group as a fallback
-              if (!totalUsers) {
-                setTotalUsers(3);
-              }
-            } catch (error) {
-              console.error('Error requesting current restaurant:', error);
-            }
+      // Ensure socketIOService is connected
+      const ensureConnection = async () => {
+        if (!socketIOService.isConnected()) {
+          try {
+            console.log('MainWindow - Connecting to Socket.IO...');
+            await socketIOService.connect(token);
+            setWsConnected(true);
+            console.log('MainWindow - Socket.IO connected successfully');
+            showStatusMessage('Connected to server');
+          } catch (error) {
+            console.error('MainWindow - Failed to connect to Socket.IO:', error);
+            setWsConnected(false);
           }
-          
-          // Add event listeners after successful connection
-          const selectionUnsubscribe = websocketService.addMessageListener('restaurant_selection', (data: any) => {
-            console.log('MainWindow - Restaurant selection - RAW DATA:', data);
-            
-            // 1. Update restaurant name
-            setRestaurantName(data.restaurantName);
-            
-            // 2. Update confirmation status
-            setConfirmed(data.confirmed);
-            
-            // 3. Reset vote state
-            // If restaurant is confirmed, we know there must be at least 2 yes votes
-            if (data.confirmed) {
-              setYesVotes(data.yesVotes !== undefined ? data.yesVotes : 2);
-            } else {
-              setYesVotes(data.yesVotes !== undefined ? data.yesVotes : 0);
-            }
-            
-            // Always use server's no votes or reset to 0
-            setNoVotes(data.noVotes !== undefined ? data.noVotes : 0);
-            
-            // 4. Reset voting state
-            setHasVoted(false);
-            
-            // 5. Set total users count (with fallback)
-            setTotalUsers(data.activeUsers || 3);
-          });
-          
-          const voteUnsubscribe = websocketService.addMessageListener('vote_update', (data: any) => {
-            console.log('MainWindow - Vote update - RAW DATA:', data);
-            
-            // =====================================================
-            // SIMPLE FIX: Prioritize confirmed status over vote counts
-            // =====================================================
-            
-            // 1. Check if this is a confirmation event
-            const isConfirmationEvent = data.isConfirmed === true && !confirmed;
-            
-            // 2. Update confirmation status
-            if (data.isConfirmed !== undefined) {
-              setConfirmed(data.isConfirmed);
-              
-              // 3. If we're becoming confirmed, ensure we have at least 2 yes votes
-              // This is because confirmation requires at least 2 yes votes
-              if (isConfirmationEvent) {
-                console.log('CONFIRMATION EVENT - Setting yes votes to at least 2');
-                setYesVotes(Math.max(2, yesVotes));
-                setStatusMessage(''); // Reset status message
-                return; // Skip the rest of the handler for confirmation events
-              }
-            }
-            
-            // 4. For normal vote updates, use the server's values
-            if (data.yesVotes !== undefined) {
-              setYesVotes(data.yesVotes);
-            }
-            
-            if (data.noVotes !== undefined) {
-              setNoVotes(data.noVotes);
-            }
-            
-            // 5. Update active users count
-            if (data.activeUsers !== undefined) {
-              setTotalUsers(data.activeUsers);
-            }
-            
-            // 6. Mark current user as having voted if this update is about their vote
-            if (data.userId === currentUserId) {
-              setHasVoted(true);
-            }
-          });
-          
-          const notificationUnsubscribe = websocketService.addMessageListener('notification', (data: any) => {
-            showStatusMessage(data.message, 5000);
-          });
-          
-          const chatUnsubscribe = websocketService.addMessageListener('chat_message', (data: any) => {
-            console.log('MainWindow - Received chat notification for message:', data);
-            
-            // Enhanced handling of incoming chat messages
-            if (data.groupId) {
-              // This is a group chat message
-              console.log('MainWindow - Received group message:', {
-                groupId: data.groupId,
-                currentGroup: currentGroup,
-                chatOpen: showGroupChat,
-                sender: data.senderName || data.username,
-                content: data.message?.substring(0, 20) + (data.message?.length > 20 ? '...' : '')
+        } else {
+          setWsConnected(true);
+          console.log('MainWindow - Socket.IO already connected');
+        }
+      };
+      
+      // First ensure we're connected
+      ensureConnection().then(() => {
+        // Fetch current restaurant and vote counts if user is part of a group
+        if (currentGroup) {
+          // First, check if there's an active restaurant selection
+          try {
+            console.log('Fetching current restaurant selection for group:', currentGroup);
+            restaurantService.getCurrentRestaurant(currentGroup, token)
+              .then((response: { 
+                restaurant: { name: string },
+                isConfirmed: boolean,
+                yesVotes: number,
+                noVotes: number,
+                activeUsers: number
+              }) => {
+                if (response.restaurant) {
+                  console.log('Current restaurant selection:', response.restaurant);
+                  setRestaurantName(response.restaurant.name);
+                  setConfirmed(response.isConfirmed);
+                  setYesVotes(response.yesVotes || 0);
+                  setNoVotes(response.noVotes || 0);
+                  
+                  // Set total users with fallback to a reasonable number 
+                  // (at least 3 users in a group or the sum of current votes)
+                  const minUserCount = Math.max(3, (response.yesVotes || 0) + (response.noVotes || 0));
+                  setTotalUsers(response.activeUsers || minUserCount);
+                  
+                  // Don't set hasVoted to true here, so the new user can still vote
+                }
+              })
+              .catch((error: Error) => {
+                console.error('Failed to fetch current restaurant:', error);
+                // Non-critical error, don't show to user
               });
-              
-              // Show notification
-              showStatusMessage(`New group chat message from ${data.senderName || data.username}`, 3000);
-              
-              // Auto-open group chat window when a group message is received
-              // and this message belongs to our current group
-              if (!showGroupChat && currentGroup === data.groupId) {
-                console.log('Auto-opening group chat for message from:', 
-                  data.senderName || data.username);
-                
-                handleStartGroupChat();
-              }
-            } else {
-              // This is a direct message
-              showStatusMessage(`New chat message from ${data.senderName || data.username}`, 3000);
-              
-              // Could add handling for direct messages here too
-              console.log('MainWindow - Received direct message from:', data.senderName || data.username);
-            }
-          });
-          
-          // Add listener for user presence updates to prevent console warnings
-          const userPresenceUnsubscribe = websocketService.addMessageListener('user_presence_update', (data: any) => {
-            // Just log it - actual UI updates happen in UserPanel when it's open
-            console.log('MainWindow - Received user presence update for:', data.username);
-          });
-          
-          // Add listener for connection established messages
-          const connectionEstablishedUnsubscribe = websocketService.addMessageListener('connection_established', (data: any) => {
-            console.log('MainWindow - Connection established with server:', data);
-            showStatusMessage(`Connected as ${data.username}`);
-          });
-          
-          // Add listener for error messages from the server
-          const errorUnsubscribe = websocketService.addMessageListener('error', (data: any) => {
-            console.error('MainWindow - Received error from server:', data);
-            showStatusMessage(`Error: ${data.message || 'Unknown error'}`, 5000);
-          });
-          
-          // Setup ping interval
-          pingInterval = setInterval(() => {
-            if (websocketService.isConnected()) {
-              websocketService.ping();
-            }
-          }, 30000);
-          
-          // Create cleanup function
-          cleanupFunction = () => {
-            console.log('Cleaning up WebSocket listeners');
-            // Add null/undefined checks for all unsubscribe functions
-            if (selectionUnsubscribe) selectionUnsubscribe();
-            if (voteUnsubscribe) voteUnsubscribe();
-            if (notificationUnsubscribe) notificationUnsubscribe();
-            if (chatUnsubscribe) chatUnsubscribe();
-            if (userPresenceUnsubscribe) userPresenceUnsubscribe();
-            if (connectionEstablishedUnsubscribe) connectionEstablishedUnsubscribe();
-            if (errorUnsubscribe) errorUnsubscribe();
             
-            if (pingInterval) clearInterval(pingInterval);
+            // We can't fetch users in group directly, so we use a fallback approach
+            // Assume at least 3 people in the group as a fallback
+            if (!totalUsers) {
+              setTotalUsers(3);
+            }
+          } catch (error) {
+            console.error('Error requesting current restaurant:', error);
+          }
+        }
+        
+        // Setup message listeners directly from socketIOService - define locally to avoid dependency issues
+        const setupLocalListeners = () => {
+          // Set up listeners for restaurant selections - using socketIOService directly
+          const restaurantListener = socketIOService.addMessageListener('restaurant_selection', (data) => {
+            console.log('Received restaurant_selection in MainWindow:', data);
+            handleRestaurantUpdate(data);
+          });
+
+          // Also listen for alternative event names the server might use
+          const randomRestaurantListener = socketIOService.addMessageListener('random_restaurant', (data) => {
+            console.log('Received random_restaurant in MainWindow:', data);
+            handleRestaurantUpdate(data);
+          });
+
+          const restaurantUpdateListener = socketIOService.addMessageListener('restaurant_update', (data) => {
+            console.log('Received restaurant_update in MainWindow:', data);
+            handleRestaurantUpdate(data);
+          });
+
+          // Unified handler for restaurant updates in any format
+          const handleRestaurantUpdate = (data: any) => {
+            // Try to extract restaurant data from different possible formats
+            const restaurantName = 
+              // Format 1: { restaurant: { name: 'Restaurant Name' } }
+              (data?.restaurant?.name) || 
+              // Format 2: { name: 'Restaurant Name' }
+              (data?.name) ||
+              // Format 3: Just the name as a string
+              (typeof data === 'string' ? data : null) ||
+              // Format 4: { data: { restaurant: { name: 'Restaurant Name' } } }
+              (data?.data?.restaurant?.name) ||
+              // Format 5: { data: { name: 'Restaurant Name' } } 
+              (data?.data?.name) ||
+              // Format 6: { restaurant: 'Restaurant Name' } - restaurant is directly a string
+              (typeof data?.restaurant === 'string' ? data.restaurant : null);
+
+            // Log what we found
+            console.log('Extracted restaurant name:', restaurantName);
             
-            // Only disconnect if no active chat windows (this was causing the disconnection issue)
-            if (!showGroupChat && !showUserChat) {
-              console.log("MainWindow - Cleaning up WebSocket connection - no active chat windows");
-              websocketService.disconnect();
-              setWsConnected(false);
+            if (restaurantName) {
+              setRestaurantName(restaurantName);
+              
+              // Extract other data with fallbacks
+              const isConfirmed = data?.isConfirmed || data?.confirmed || data?.data?.isConfirmed || false;
+              const yesVotes = data?.yesVotes || data?.data?.yesVotes || 0;
+              const noVotes = data?.noVotes || data?.data?.noVotes || 0;
+              
+              setConfirmed(isConfirmed);
+              setYesVotes(yesVotes);
+              setNoVotes(noVotes);
+              
+              // Reset voting state when new restaurant is selected
+              setHasVoted(false);
+              
+              showStatusMessage(`Restaurant selected: ${restaurantName}`);
+              console.log('Updated UI with new restaurant:', restaurantName);
             } else {
-              console.log("MainWindow - Keeping WebSocket connection active for chat windows");
+              console.error('Could not extract restaurant name from data:', data);
             }
           };
-        })
-        .catch(error => {
-          console.error('MainWindow - WebSocket connection failed:', error);
-          setWsConnected(false);
-          showStatusMessage('Failed to connect to server', 5000);
-        });
-    } else if (!isLoggedIn && websocketService.isConnected()) {
-      // Ensure connection is closed when user logs out
-      console.log("MainWindow - Disconnecting WebSocket due to logout");
-      websocketService.disconnect();
-      setWsConnected(false);
+          
+          // Set up listeners for vote updates - using socketIOService directly
+          const voteListener = socketIOService.addMessageListener('vote_update', (data) => {
+            console.log('Received vote update in MainWindow:', data);
+            if (data) {
+              // Update vote counts
+              setYesVotes(data.yesVotes || 0);
+              setNoVotes(data.noVotes || 0);
+              setConfirmed(data.isConfirmed || false);
+              
+              // Show a status message about the vote
+              const username = data.username || 'Someone';
+              const voteText = data.vote ? 'yes' : 'no';
+              showStatusMessage(`${username} voted ${voteText}`);
+            }
+          });
+          
+          // Set up listeners for notifications - using socketIOService directly
+          const notificationListener = socketIOService.addMessageListener('notification', (data) => {
+            console.log('Received notification in MainWindow:', data);
+            if (data && data.message) {
+              showStatusMessage(data.message);
+            }
+          });
+          
+          // Listen for group messages to auto-open chat window
+          const groupMessageListener = socketIOService.addMessageListener('group_message', (data) => {
+            console.log('Received group message in MainWindow:', data);
+            // If group chat isn't already open, open it
+            if (!showGroupChat && data && data.groupId === currentGroup) {
+              console.log('Auto-opening group chat window for incoming message');
+              handleStartGroupChat();
+            }
+          });
+          
+          // Return a cleanup function to remove all listeners
+          return () => {
+            restaurantListener();
+            randomRestaurantListener();
+            restaurantUpdateListener();
+            voteListener();
+            notificationListener();
+            groupMessageListener();
+          };
+        };
+        
+        // Set up the listeners
+        cleanupFunction = setupLocalListeners();
+        
+        // Set up a ping interval to keep the connection alive
+        pingInterval = setInterval(() => {
+          if (socketIOService.isConnected()) {
+            socketIOService.sendPing();
+          } else {
+            console.log('MainWindow - Socket.IO disconnected, attempting to reconnect...');
+            ensureConnection();
+          }
+        }, 30000); // Send ping every 30 seconds
+      });
     }
     
-    // Return cleanup function
+    // Cleanup function to remove event listeners and clear intervals
     return () => {
       if (cleanupFunction) {
-        console.log("MainWindow - Unmounting, cleaning up WebSocket listeners");
         cleanupFunction();
       }
+      
+      if (pingInterval) {
+        clearInterval(pingInterval);
+      }
     };
-  }, [isLoggedIn, token, currentGroup, showGroupChat, showUserChat]);
+  }, [isLoggedIn, token, currentGroup, totalUsers]);
 
   // Add useEffect to check for existing session on component mount
   useEffect(() => {
@@ -499,9 +462,9 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
         await authService.logout(token);
       }
       
-      // Ensure WebSocket is disconnected
-      if (websocketService && wsConnected) {
-        websocketService.disconnect();
+      // Ensure Socket.IO is disconnected
+      if (socketIOService && isConnected) {
+        socketIOService.disconnect();
       }
       
       // Reset connection state first
@@ -585,90 +548,6 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     console.log(`Cleared ${keys.length} saved window visibility states`);
   };
 
-  // Voting functions using WebSocket
-  const handleVoteYes = async () => {
-    if (!currentGroup) return;
-    
-    if (wsConnected) {
-      // Send vote through WebSocket
-      websocketService.sendVote(true);
-      showStatusMessage('Your vote was cast');
-      setHasVoted(true);
-      
-      // Immediately increment local yes count for UI responsiveness
-      // The actual count will be updated when server responds
-      setYesVotes(prevYesVotes => prevYesVotes + 1);
-    } else {
-      // Fallback to REST API
-      try {
-        const response = await restaurantService.voteYes(currentGroup, token);
-        setConfirmed(response.isConfirmed);
-        setYesVotes(response.yesVotes || yesVotes + 1);
-        setNoVotes(response.noVotes || noVotes);
-        setHasVoted(true);
-        showStatusMessage('Your vote was cast');
-      } catch (error) {
-        console.error('Failed to vote yes:', error);
-        showStatusMessage('Failed to vote yes', 5000);
-      }
-    }
-  };
-
-  const handleVoteNo = async () => {
-    if (!currentGroup) return;
-    
-    if (wsConnected) {
-      // Send vote through WebSocket
-      websocketService.sendVote(false);
-      showStatusMessage('Your vote was cast');
-      setHasVoted(true);
-      
-      // Immediately increment local no count for UI responsiveness
-      // The actual count will be updated when server responds
-      setNoVotes(prevNoVotes => prevNoVotes + 1);
-    } else {
-      // Fallback to REST API
-      try {
-        const response = await restaurantService.voteNo(currentGroup, token);
-        setConfirmed(response.isConfirmed);
-        setYesVotes(response.yesVotes || yesVotes);
-        setNoVotes(response.noVotes || noVotes + 1);
-        setHasVoted(true);
-        showStatusMessage('Your vote was cast');
-      } catch (error) {
-        console.error('Failed to vote no:', error);
-        showStatusMessage('Failed to vote no', 5000);
-      }
-    }
-  };
-
-  const handleNewRandom = async () => {
-    if (!currentGroup) return;
-    
-    if (wsConnected) {
-      // Send new random request through WebSocket
-      websocketService.sendNewRandom(currentGroup);
-      showStatusMessage('Selecting a new random restaurant...');
-      setYesVotes(0);
-      setNoVotes(0);
-      setHasVoted(false);
-    } else {
-      // Fallback to REST API
-      try {
-        const response = await restaurantService.getRandomRestaurant(currentGroup, token);
-        setRestaurantName(response.restaurant.name);
-        setConfirmed(false);
-        setYesVotes(0);
-        setNoVotes(0);
-        setHasVoted(false);
-        showStatusMessage('Selected a new random restaurant');
-      } catch (error) {
-        console.error('Failed to get random restaurant:', error);
-        showStatusMessage('Failed to select a new restaurant', 5000);
-      }
-    }
-  };
-
   // Update sessionStorage when window visibility changes
   useEffect(() => {
     sessionStorage.setItem('window_visibility_login', showLoginDialog.toString());
@@ -726,6 +605,163 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
     setGroupChatData(null);
     
     showStatusMessage('All windows closed');
+  };
+
+  // Update vote functions
+  const handleVoteYes = async () => {
+    if (hasVoted) {
+      showStatusMessage('You have already voted');
+      return;
+    }
+    
+    if (!currentGroup) {
+      showStatusMessage('You need to be in a group to vote');
+      return;
+    }
+    
+    try {
+      // Connect if needed
+      if (!socketIOService.isConnected() && token) {
+        showStatusMessage('Connecting to server...', 1000);
+        try {
+          await socketIOService.connect(token);
+        } catch (error) {
+          console.error('Failed to connect before voting:', error);
+        }
+      }
+      
+      // Optimistically update UI
+      setHasVoted(true);
+      setYesVotes(prevYesVotes => prevYesVotes + 1); // Increment yes votes locally
+      showStatusMessage('You voted Yes!');
+      
+      // Use socketIOService directly with the groupId
+      socketIOService.sendMessage('vote', { 
+        vote: true,
+        groupId: currentGroup
+      });
+    } catch (error) {
+      // Revert optimistic updates on error
+      setHasVoted(false);
+      setYesVotes(prevYesVotes => Math.max(0, prevYesVotes - 1));
+      
+      console.error('Error sending vote:', error);
+      showStatusMessage('Failed to send vote. Please try again.', 3000);
+    }
+  };
+  
+  const handleVoteNo = async () => {
+    if (hasVoted) {
+      showStatusMessage('You have already voted');
+      return;
+    }
+    
+    if (!currentGroup) {
+      showStatusMessage('You need to be in a group to vote');
+      return;
+    }
+    
+    try {
+      // Connect if needed
+      if (!socketIOService.isConnected() && token) {
+        showStatusMessage('Connecting to server...', 1000);
+        try {
+          await socketIOService.connect(token);
+        } catch (error) {
+          console.error('Failed to connect before voting:', error);
+        }
+      }
+      
+      // Optimistically update UI
+      setHasVoted(true);
+      setNoVotes(prevNoVotes => prevNoVotes + 1); // Increment no votes locally
+      showStatusMessage('You voted No!');
+      
+      // Use socketIOService directly with the groupId
+      socketIOService.sendMessage('vote', { 
+        vote: false,
+        groupId: currentGroup
+      });
+    } catch (error) {
+      // Revert optimistic updates on error
+      setHasVoted(false);
+      setNoVotes(prevNoVotes => Math.max(0, prevNoVotes - 1));
+      
+      console.error('Error sending vote:', error);
+      showStatusMessage('Failed to send vote. Please try again.', 3000);
+    }
+  };
+  
+  const handleNewRandom = async () => {
+    if (!currentGroup) {
+      showStatusMessage('You need to be in a group to request a random restaurant');
+      return;
+    }
+    
+    try {
+      // Connect if needed
+      if (!socketIOService.isConnected() && token) {
+        showStatusMessage('Connecting to server...', 1000);
+        try {
+          await socketIOService.connect(token);
+        } catch (error) {
+          console.error('Failed to connect for random restaurant request:', error);
+        }
+      }
+      
+      console.log('Requesting new random restaurant for group:', currentGroup);
+      
+      // Optimistically update UI before server responds
+      setRestaurantName('Requesting...');
+      showStatusMessage('Requesting new random restaurant selection');
+      
+      // Reset votes locally before server response
+      setHasVoted(false);
+      setYesVotes(0);
+      setNoVotes(0);
+      
+      // Send the request with the group ID
+      socketIOService.requestRandomRestaurant(currentGroup);
+      
+      // Safety timeout - if server doesn't respond in 5 seconds, try to fetch restaurant data directly
+      setTimeout(() => {
+        // Only run this if we're still showing "Requesting..."
+        if (restaurantName === 'Requesting...') {
+          console.log('No server response after timeout, fetching restaurant directly...');
+          
+          // Try to fetch current restaurant through REST API
+          restaurantService.getCurrentRestaurant(currentGroup, token)
+            .then((response: { 
+              restaurant: { name: string },
+              isConfirmed: boolean,
+              yesVotes: number,
+              noVotes: number,
+              activeUsers: number
+            }) => {
+              if (response.restaurant && response.restaurant.name) {
+                console.log('Fetched current restaurant directly:', response.restaurant);
+                setRestaurantName(response.restaurant.name);
+                setConfirmed(response.isConfirmed);
+                setYesVotes(response.yesVotes || 0);
+                setNoVotes(response.noVotes || 0);
+                showStatusMessage(`Restaurant selected: ${response.restaurant.name}`);
+              } else {
+                // If we cannot fetch a restaurant, show an error
+                setRestaurantName('Error - please try again');
+                showStatusMessage('Failed to get restaurant selection. Please try again.', 3000);
+              }
+            })
+            .catch((error) => {
+              console.error('Failed to fetch current restaurant directly:', error);
+              setRestaurantName('Error - please try again');
+              showStatusMessage('Failed to get restaurant selection. Please try again.', 3000);
+            });
+        }
+      }, 5000);
+    } catch (error) {
+      console.error('Error requesting random restaurant:', error);
+      showStatusMessage('Failed to request random restaurant. Please try again.', 3000);
+    }
   };
 
   return isVisible && isInitialized ? (
@@ -840,8 +876,8 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
                   onVoteYes={handleVoteYes} 
                   onVoteNo={handleVoteNo} 
                   onNewRandom={handleNewRandom}
-                  enabled={isLoggedIn && wsConnected && !hasVoted && restaurantName !== '' && !confirmed}
-                  newRandomEnabled={isLoggedIn && wsConnected}
+                  enabled={isLoggedIn && wsConnected && !hasVoted && restaurantName !== '' && restaurantName !== 'Requesting...' && !confirmed}
+                  newRandomEnabled={isLoggedIn}
                 />
               </>
             ) : (

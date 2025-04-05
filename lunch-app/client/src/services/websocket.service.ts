@@ -14,6 +14,86 @@ class WebSocketService {
   private pingInterval: NodeJS.Timeout | null = null;
   private lastPongReceived: number = 0;
   private connectionAttempt: number = 0;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatTimeout: NodeJS.Timeout | null = null;
+  private lastHeartbeatResponse: number = 0;
+  private sentMessageAcks: Map<string, boolean> = new Map(); // Track which messages were acknowledged
+  private connectionStableTimeout: NodeJS.Timeout | null = null;
+  private isConnectionStable: boolean = false;
+  private sessionId: string = this.generateSessionId(); // Unique ID for this browser tab
+
+  // Generate a unique session ID for this tab
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  }
+
+  constructor() {
+    // When the service is created, set up cross-tab message handling
+    this.setupCrossTabCommunication();
+
+    // Load any previously seen message IDs from sessionStorage
+    this.loadProcessedMessageIds();
+  }
+
+  // Set up communication between tabs for sharing processed message IDs
+  private setupCrossTabCommunication(): void {
+    // Listen for processed message IDs from other tabs
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'ws_processed_message') {
+        try {
+          const data = JSON.parse(event.newValue || '{}');
+          if (data.messageId && data.sessionId !== this.sessionId) {
+            // Add this message ID to our processed set if from another tab
+            this.processedMessageIds.add(data.messageId);
+            console.log(`Added message ID ${data.messageId} from another tab`);
+          }
+        } catch (error) {
+          console.error('Error parsing cross-tab message:', error);
+        }
+      }
+    });
+  }
+
+  // Load previously processed message IDs from sessionStorage
+  private loadProcessedMessageIds(): void {
+    try {
+      const savedIds = sessionStorage.getItem('processed_message_ids');
+      if (savedIds) {
+        const idArray = JSON.parse(savedIds);
+        idArray.forEach((id: string) => this.processedMessageIds.add(id));
+        console.log(`Loaded ${idArray.length} processed message IDs from storage`);
+      }
+    } catch (error) {
+      console.error('Error loading processed message IDs:', error);
+    }
+  }
+
+  // Save processed message IDs to sessionStorage
+  private saveProcessedMessageIds(): void {
+    try {
+      if (this.processedMessageIds.size > 0) {
+        const idArray = Array.from(this.processedMessageIds);
+        // Only store the last 1000 IDs to avoid storage limits
+        const trimmedArray = idArray.slice(-1000);
+        sessionStorage.setItem('processed_message_ids', JSON.stringify(trimmedArray));
+      }
+    } catch (error) {
+      console.error('Error saving processed message IDs:', error);
+    }
+  }
+
+  // Share a processed message ID with other tabs
+  private shareProcessedMessageId(messageId: string): void {
+    try {
+      localStorage.setItem('ws_processed_message', JSON.stringify({
+        messageId,
+        sessionId: this.sessionId,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error('Error sharing processed message ID:', error);
+    }
+  }
 
   /**
    * Broadcast connection status change to all components
@@ -98,6 +178,9 @@ class WebSocketService {
           }
           this.broadcastConnectionStatus(true);
           this.startPing(); // Start sending pings
+          this.startHeartbeat(); // Start heartbeat monitoring
+          // Initialize heartbeat response time to now
+          this.lastHeartbeatResponse = Date.now();
           resolve();
         };
         
@@ -284,13 +367,57 @@ class WebSocketService {
    * @param message Parsed message from the server
    */
   private handleMessage(message: any): void {
-    // Check for duplicate messages (in case of reconnection)
+    // Update heartbeat timestamp for ANY message received
+    this.updateHeartbeatResponse();
+    
+    // Handle message acknowledgments
+    if (message.type === 'message_ack' && message.data?.messageId) {
+      console.log(`Received acknowledgment for message ${message.data.messageId}`);
+      if (this.sentMessageAcks.has(message.data.messageId)) {
+        this.sentMessageAcks.set(message.data.messageId, true);
+      }
+      return; // Don't need further processing for acks
+    }
+    
+    // For chat messages, use proper message ID tracking
+    if (message.type === 'chat_message') {
+      const messageId = message.data?.messageId || 
+                        `${message.data?.userId}-${message.data?.message}-${message.data?.timestamp}`;
+      
+      // Check if we've already processed this exact message
+      if (this.processedMessageIds.has(messageId)) {
+        console.log('Ignoring already processed message:', messageId);
+        return;
+      }
+      
+      // Mark as processed and share with other tabs
+      this.processedMessageIds.add(messageId);
+      this.shareProcessedMessageId(messageId);
+      this.saveProcessedMessageIds();
+      
+      // Send acknowledgment if requested
+      if (message.data?.requestAck && this.socket?.readyState === WebSocket.OPEN) {
+        try {
+          this.socket.send(JSON.stringify({
+            type: 'message_ack',
+            data: {
+              messageId: message.data.messageId,
+              timestamp: Date.now()
+            }
+          }));
+        } catch (e) {
+          console.error('Failed to send message acknowledgment:', e);
+        }
+      }
+    }
+    
+    // Legacy message ID handling
     if (message.id && this.processedMessageIds.has(message.id)) {
-      console.log('Ignoring duplicate message:', message.id);
+      console.log('Ignoring duplicate message by ID:', message.id);
       return;
     }
     
-    // Add message ID to processed set if it has one
+    // Add any message ID to processed set
     if (message.id) {
       this.processedMessageIds.add(message.id);
       
@@ -403,26 +530,70 @@ class WebSocketService {
   }
 
   /**
-   * Check if WebSocket is currently connected
+   * Check if the WebSocket is currently connected
    */
   isConnected(): boolean {
-    const connected = this.socket !== null && this.socket.readyState === WebSocket.OPEN;
-    
-    // Debug log connection status but only at specific intervals to avoid console spam
-    if (Date.now() % 5000 < 100) { // Log roughly every 5 seconds
-      console.debug('WebSocket connection check:', { 
-        connected, 
-        socketExists: this.socket !== null,
-        readyState: this.socket?.readyState,
-        readyStateText: this.socket ? 
-          ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.socket.readyState] : 'NO_SOCKET'
-      });
+    // First check if socket exists
+    if (!this.socket) {
+      return false;
     }
     
-    // Broadcast any connection status change
-    this.broadcastConnectionStatus(connected);
+    // Then check readyState
+    const connected = this.socket.readyState === WebSocket.OPEN;
     
-    return connected;
+    // If basic connection check failed, we're definitely not connected
+    if (!connected) {
+      // If we thought we were connected before, this is a state change
+      if (this.lastConnectionState) {
+        console.log('WebSocketService - Socket disconnected, no longer OPEN');
+        this.lastConnectionState = false;
+        this.broadcastConnectionStatus(false);
+        this.isConnectionStable = false;
+      }
+      return false;
+    }
+    
+    // Now check heartbeat - more forgiving timeout (20 seconds instead of 15)
+    // This helps avoid flapping connections
+    const hasRecentHeartbeat = (Date.now() - this.lastHeartbeatResponse) < 20000;
+    
+    // Only consider disconnected if we have an old connection AND we've had at least one heartbeat
+    const isActuallyConnected = connected && 
+      (this.lastHeartbeatResponse === 0 || hasRecentHeartbeat);
+    
+    // If our state suddenly changes, handle it
+    if (this.lastConnectionState !== isActuallyConnected) {
+      console.log(`WebSocketService - Connection state change detected: ${this.lastConnectionState} → ${isActuallyConnected}`);
+      
+      // Clear the stable connection timeout if we're disconnecting
+      if (!isActuallyConnected && this.connectionStableTimeout) {
+        clearTimeout(this.connectionStableTimeout);
+        this.connectionStableTimeout = null;
+        this.isConnectionStable = false;
+      }
+      
+      // Start a timer for stable connection if we just connected
+      if (isActuallyConnected && !this.isConnectionStable && !this.connectionStableTimeout) {
+        console.log('Starting connection stability timer');
+        this.connectionStableTimeout = setTimeout(() => {
+          this.isConnectionStable = true;
+          console.log('WebSocketService - Connection is now considered stable');
+        }, 3000); // Wait 3 seconds to consider the connection stable
+      }
+      
+      // Update last state and broadcast change
+      this.lastConnectionState = isActuallyConnected;
+      this.broadcastConnectionStatus(isActuallyConnected);
+    }
+    
+    return isActuallyConnected;
+  }
+
+  /**
+   * Check if the connection is stable (connected for at least 3 seconds)
+   */
+  isStableConnection(): boolean {
+    return this.isConnected() && this.isConnectionStable;
   }
 
   /**
@@ -481,78 +652,91 @@ class WebSocketService {
   }
 
   /**
-   * Send a chat message
-   * @param message Message text
-   * @param targetId Target user or group ID
+   * Send a chat message to a user or group
+   * @param message Message content
+   * @param targetId User ID or Group ID
    * @param isGroupChat Whether this is a group chat
+   * @returns The generated message ID for tracking
    */
-  sendChatMessage(message: string, targetId: number, isGroupChat = false): void {
-    console.log('WEBSOCKET SERVICE - sendChatMessage called with:', {
-      message,
-      targetId,
-      isGroupChat,
-      socketConnected: this.socket !== null
-    });
-    
-    if (!this.socket) {
-      console.error('WEBSOCKET SERVICE - Cannot send chat message: Socket not connected');
+  sendChatMessage(message: string, targetId: number, isGroupChat = false): string {
+    if (!this.isConnected()) {
+      console.error('Cannot send chat message: WebSocket not connected');
       throw new Error('WebSocket not connected');
     }
     
-    if (!message || message.trim() === '') {
-      console.error('WEBSOCKET SERVICE - Cannot send empty message');
-      throw new Error('Message cannot be empty');
+    if (!message || !targetId) {
+      console.error('Cannot send chat message: Missing required data', { message, targetId });
+      throw new Error('Missing required message data');
     }
     
-    if (!targetId) {
-      console.error('WEBSOCKET SERVICE - Cannot send message: No target ID provided');
-      throw new Error('Target ID is required');
-    }
-    
-    // Get current user information
+    // Get the current authenticated user ID
     const userId = localStorage.getItem('userId');
     const username = localStorage.getItem('username');
     
     if (!userId) {
-      console.error('WEBSOCKET SERVICE - Cannot send message: No user ID available');
-      throw new Error('User ID is required');
+      console.error('Cannot send chat message: User ID not available');
+      throw new Error('User ID not available');
     }
     
-    console.log('WEBSOCKET SERVICE - User info for message:', {
-      userId,
-      username,
-      targetId: targetId,
-      isGroupChat
-    });
-    
-    // Create unique timestamp for message
-    const timestamp = new Date().toISOString();
-    
-    // Generate a message ID for deduplication
-    const messageId = `${timestamp}-${userId}-${isGroupChat ? targetId : 'to-' + targetId}-${message.substring(0, 10)}`;
+    // Generate a unique message ID
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     
     try {
+      const timestamp = new Date().toISOString();
+      
       const payload = {
         type: 'chat_message',
         data: {
-          message: message.trim(),
-          targetId: targetId,
-          isGroupChat: isGroupChat,
-          timestamp: timestamp,
-          messageId: messageId,
-          // Include sender info explicitly
-          userId: parseInt(userId, 10),
-          username: username || 'User',
-          // FIXED: Always include the groupId explicitly when it's a group chat
-          groupId: isGroupChat ? targetId : undefined
+          messageId: messageId,                 // Unique ID to prevent duplication
+          message: message,                     // Content
+          timestamp: timestamp,                 // ISO string timestamp
+          userId: parseInt(userId, 10),         // Sender ID 
+          username: username || 'Unknown',      // Sender name
+          targetId: targetId,                   // Target user/group ID
+          isGroupChat: isGroupChat,             // Flag for group vs direct
+          groupId: isGroupChat ? targetId : undefined, // For group messages
+          requestAck: true                      // Request server acknowledgment
         }
       };
       
-      console.log('WEBSOCKET SERVICE - Sending chat message:', payload);
-      this.socket.send(JSON.stringify(payload));
-      console.log('WEBSOCKET SERVICE - Message sent successfully');
+      // Track this message ID to prevent duplicates if it comes back to us
+      this.processedMessageIds.add(messageId);
+      
+      // Track that we're waiting for acknowledgment
+      this.sentMessageAcks.set(messageId, false);
+      
+      // Set a timeout to retry if no acknowledgment received
+      setTimeout(() => {
+        if (this.sentMessageAcks.has(messageId) && !this.sentMessageAcks.get(messageId)) {
+          console.warn(`No acknowledgment received for message ${messageId} after 5 seconds`);
+          
+          // Check if we're still connected
+          if (this.isConnected()) {
+            console.log('Still connected, marking message as potentially failed');
+            // We could implement a retry mechanism here if needed
+          } else {
+            console.log('Connection lost, message delivery uncertain');
+          }
+        }
+      }, 5000);
+      
+      // Log message with sensitive data masked
+      console.log('Sending chat message:', {
+        ...payload,
+        data: {
+          ...payload.data,
+          message: message.length > 20 ? 
+            `${message.substring(0, 20)}...` : message
+        }
+      });
+      
+      // Send the message
+      this.socket?.send(JSON.stringify(payload));
+      
+      // Return the message ID for reference
+      return messageId;
     } catch (error) {
-      console.error('WEBSOCKET SERVICE - Error sending chat message:', error);
+      console.error('Error sending chat message:', error);
       throw error;
     }
   }
@@ -605,11 +789,16 @@ class WebSocketService {
     }, 30000); // Send ping every 30 seconds
   }
 
+  /**
+   * Stop sending ping messages
+   */
   private stopPing(): void {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
+    // Also stop the heartbeat system
+    this.stopHeartbeat();
   }
 
   // Add listener for connection status changes
@@ -624,6 +813,110 @@ class WebSocketService {
               this.connectionListeners = this.connectionListeners.filter(cb => cb !== callback);
           }
       };
+  }
+
+  /**
+   * Start sending heartbeats to verify connection is alive
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // Clear any existing heartbeat
+    
+    // Initialize last heartbeat time
+    this.lastHeartbeatResponse = Date.now();
+    
+    // Send heartbeat every 5 seconds (less aggressive than 3s)
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      
+      try {
+        // Send a heartbeat ping with a unique ID
+        const heartbeatId = Date.now().toString();
+        this.socket.send(JSON.stringify({ 
+          type: 'heartbeat', 
+          data: { 
+            timestamp: Date.now(),
+            heartbeatId: heartbeatId,
+            sessionId: this.sessionId // Include session ID for better tracking
+          } 
+        }));
+        
+        // Set a timeout to verify response
+        this.heartbeatTimeout = setTimeout(() => {
+          // If it's been more than 12 seconds since last response, connection is likely dead
+          const timeSinceLastResponse = Date.now() - this.lastHeartbeatResponse;
+          if (timeSinceLastResponse > 12000) {
+            console.warn(`WebSocketService - No heartbeat response in ${timeSinceLastResponse}ms, connection may be dead`);
+            
+            // Don't immediately disconnect - try once more with a ping
+            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+              try {
+                this.socket.send(JSON.stringify({ 
+                  type: 'ping', 
+                  data: { timestamp: Date.now() } 
+                }));
+                
+                // If still no response after another 3 seconds, then consider dead
+                setTimeout(() => {
+                  if (Date.now() - this.lastHeartbeatResponse > 15000) {
+                    console.error('WebSocketService - Connection confirmed dead, closing');
+                    this.broadcastConnectionStatus(false);
+                    this.isConnectionStable = false;
+                    
+                    // Force close and reconnect
+                    if (this.socket) {
+                      try {
+                        this.socket.close(4000, "Heartbeat timeout");
+                      } catch (e) {
+                        console.error("Error closing socket:", e);
+                      }
+                      this.socket = null;
+                    }
+                    
+                    // Get token and attempt reconnection after a short delay
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                      setTimeout(() => {
+                        this.connect(token).catch(err => {
+                          console.error('Failed to reconnect after heartbeat failure:', err);
+                        });
+                      }, 2000); // Longer delay before reconnecting to avoid connection flapping
+                    }
+                  }
+                }, 3000);
+              } catch (pingError) {
+                console.error('Error sending emergency ping:', pingError);
+              }
+            }
+          }
+        }, 7000); // Longer timeout for heartbeat response
+      } catch (error) {
+        console.error('Error sending heartbeat:', error);
+      }
+    }, 5000); // Every 5 seconds
+  }
+  
+  /**
+   * Stop sending heartbeats
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+  
+  /**
+   * Update the last heartbeat response time
+   */
+  private updateHeartbeatResponse(): void {
+    this.lastHeartbeatResponse = Date.now();
   }
 }
 

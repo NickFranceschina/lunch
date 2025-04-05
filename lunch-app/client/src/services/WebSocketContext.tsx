@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { websocketService } from './websocket.service';
+import { socketIOService } from './socketio.service';
 import { useAuth } from './AuthContext';
 
 interface WebSocketContextType {
@@ -33,7 +33,7 @@ interface WebSocketProviderProps {
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
-  const [isConnected, setIsConnected] = useState<boolean>(websocketService.isConnected());
+  const [isConnected, setIsConnected] = useState<boolean>(socketIOService.isConnected());
   const { authState } = useAuth();
   
   // Effect to manage connection based on auth state
@@ -42,58 +42,62 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     const isAuthenticated = authState?.isAuthenticated;
 
     if (!isAuthenticated || !token) {
-      if (websocketService.isConnected()) { // Check current service state
-        websocketService.disconnect();
+      if (socketIOService.isConnected()) { // Check current service state
+        socketIOService.disconnect();
       }
       setIsConnected(false); // Update local state
       return; // Exit if not authenticated
     }
 
     // If authenticated and have token, try to connect
-    const connectWebSocket = async () => {
+    const connectSocket = async () => {
       try {
-        // Only connect if not already connected or attempting
-        if (!websocketService.isConnected() /* && !websocketService.isConnecting() // Add if service has this */ ) {
-           console.log('WebSocketContext - Attempting connection...');
-           await websocketService.connect(token); // Pass the safe token
-           // The connection listener should update isConnected state
-        }
+        console.log('WebSocketContext - Attempting connection...');
+        await socketIOService.connect(token);
+        // Connection listener will update isConnected state
       } catch (error) {
-        console.error('WebSocketContext - Failed to connect to WebSocket:', error);
+        console.error('WebSocketContext - Failed to connect to Socket.IO:', error);
         setIsConnected(false); // Ensure state is false on error
       }
     };
 
-    connectWebSocket();
+    connectSocket();
 
     // Cleanup function: Disconnect if component unmounts or auth changes
     return () => {
       console.log('WebSocketContext - Cleanup: Checking if disconnect needed...');
-      // Check if still connected before disconnecting
       try {
-        if (websocketService && websocketService.isConnected()) {
-          console.log('WebSocketContext - Cleanup: Disconnecting WebSocket...');
-          websocketService.disconnect();
+        if (socketIOService.isConnected()) {
+          console.log('WebSocketContext - Cleanup: Disconnecting Socket.IO...');
+          socketIOService.disconnect();
           setIsConnected(false);
         }
       } catch (error) {
         console.error('WebSocketContext - Error during cleanup:', error);
       }
     };
-  // Add authState?.token and authState?.isAuthenticated to dependencies
   }, [authState?.token, authState?.isAuthenticated]);
   
-  // Effect to manage generic message listener (for lastMessage state)
-  // Note: This catches ALL messages. Specific listeners should be preferred.
+  // Effect to listen for connection status changes
   useEffect(() => {
-    const catchAllUnsubscribe = websocketService.addMessageListener('*', (data) => {
-      // This is a placeholder. You might not need a generic lastMessage state.
-      // If used, filter out specific types handled elsewhere or adjust logic.
-      // console.log("Generic listener received: ", data);
-      // setLastMessage(data); 
-    });
+    const handleConnectionChange = (isConnected: boolean) => {
+      setIsConnected(isConnected);
+    };
     
-    return () => catchAllUnsubscribe();
+    // Add connection listener
+    const removeListener = socketIOService.addConnectionListener(handleConnectionChange);
+    
+    // Also listen for DOM events for broader notification
+    const domListener = (event: any) => {
+      setIsConnected(event.detail);
+    };
+    
+    window.addEventListener('socket:connection_changed', domListener);
+    
+    return () => {
+      removeListener();
+      window.removeEventListener('socket:connection_changed', domListener);
+    };
   }, []);
   
   // Wrapper for sendMessage
@@ -101,19 +105,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     console.log('WebSocketContext - sending message:', { type, data });
     
     // Force a direct connection check first
-    const isConnected = websocketService.isConnected();
+    const isConnected = socketIOService.isConnected();
     if (!isConnected) {
-      console.error('WebSocketContext - Cannot send message: WebSocket not connected');
+      console.error('WebSocketContext - Cannot send message: Socket.IO not connected');
       
       // Attempt reconnection if we have a token
       if (authState.token) {
         console.log('WebSocketContext - Attempting reconnection before sending...');
-        websocketService.connect(authState.token)
+        socketIOService.connect(authState.token)
           .then(() => {
-            if (websocketService.isConnected()) {
+            if (socketIOService.isConnected()) {
               console.log('WebSocketContext - Reconnected successfully, now sending message');
               try {
-                websocketService.sendMessage(type, data);
+                socketIOService.sendMessage(type, data);
               } catch (sendError) {
                 console.error('WebSocketContext - Failed to send message after reconnection:', sendError);
               }
@@ -129,25 +133,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
     
     try {
-      websocketService.sendMessage(type, data);
+      socketIOService.sendMessage(type, data);
     } catch (error) {
       console.error('WebSocketContext - Error sending message:', error);
     }
   }, [authState.token]);
   
-  // Wrapper for addMessageListener with corrected type
+  // Wrapper for addMessageListener
   const addMessageListener = useCallback((type: string, callback: (data: any) => void) => {
-    return websocketService.addMessageListener(type, callback);
+    return socketIOService.addMessageListener(type, callback);
   }, []);
   
-  // Wrapper for addConnectionListener (already correct in service, just provide wrapper)
+  // Wrapper for addConnectionListener
   const addConnectionListener = useCallback((callback: (isConnected: boolean) => void) => {
-    return websocketService.addConnectionListener(callback);
+    return socketIOService.addConnectionListener(callback);
   }, []);
   
   const contextValue: WebSocketContextType = {
     isConnected,
-    lastMessage: null,
+    lastMessage: null, // We don't store last message anymore, it's event-based
     sendMessage,
     addMessageListener,
     addConnectionListener
@@ -162,24 +166,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 export const useWebSocket = (): WebSocketContextType => {
   const context = useContext(WebSocketContext);
-  // Check if context is undefined, meaning the hook is used outside the provider
   if (context === undefined) {
-    // Throw an error in development, provide a default safe object in production?
-    // Or always throw error to enforce provider usage.
     if (process.env.NODE_ENV === 'development') {
-        console.error('useWebSocket must be used within a WebSocketProvider');
+      console.error('useWebSocket must be used within a WebSocketProvider');
     }
-    // To prevent runtime errors when context is undefined, return a default object.
-    // This might hide bugs, throwing an error is often better.
-    // For now, let's return a safe default to fix the linter, but consider throwing.
     return {
-        isConnected: false,
-        lastMessage: null,
-        sendMessage: () => console.warn('WebSocket provider not found'),
-        addMessageListener: () => { console.warn('WebSocket provider not found'); return () => {}; },
-        addConnectionListener: () => { console.warn('WebSocket provider not found'); return () => {}; }
+      isConnected: false,
+      lastMessage: null,
+      sendMessage: () => console.warn('WebSocket provider not found'),
+      addMessageListener: () => { console.warn('WebSocket provider not found'); return () => {}; },
+      addConnectionListener: () => { console.warn('WebSocket provider not found'); return () => {}; }
     };
-    // Alternatively: throw new Error('useWebSocket must be used within a WebSocketProvider');
   }
   return context;
 };
