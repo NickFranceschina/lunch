@@ -19,6 +19,23 @@ const ExternalApps: React.FC = () => {
     });
   }, [visibleWindows]);
 
+  // Listen for toggle_app events from the Start menu
+  useEffect(() => {
+    const handleToggleApp = (event: CustomEvent) => {
+      const { id, visible } = event.detail;
+      console.log(`Toggle app event received for ${id}, visible: ${visible}`);
+      setVisibleWindows(prev => ({
+        ...prev,
+        [id]: visible
+      }));
+    };
+
+    window.addEventListener('toggle_app', handleToggleApp as EventListener);
+    return () => {
+      window.removeEventListener('toggle_app', handleToggleApp as EventListener);
+    };
+  }, []);
+
   const toggleWindowVisibility = (id: string) => {
     setVisibleWindows(prev => ({
       ...prev,

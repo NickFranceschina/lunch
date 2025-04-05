@@ -120,6 +120,7 @@ function App() {
           {/* Taskbar */}
           <Win98Taskbar 
             toggleMainWindowVisibility={toggleMainWindowVisibility}
+            toggleHelpWindowVisibility={toggleHelpWindowVisibility}
           />
         </WebSocketProvider>
       </AuthProvider>
