@@ -13,31 +13,42 @@ jest.mock('axios', () => ({
   }
 }));
 
+// Import React and testing utils first
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+
+// Import the actual MainWindow
+import MainWindow from './MainWindow';
+
+// Mock WebSocketContext
+const mockWebSocketValue = {
+  isConnected: false,
+  lastMessage: null,
+  sendMessage: jest.fn(),
+  addMessageListener: jest.fn().mockReturnValue(() => {}),
+  addConnectionListener: jest.fn().mockReturnValue(() => {})
+};
+
+// Mock WebSocketContext
+jest.mock('../services/WebSocketContext', () => ({
+  WebSocketProvider: ({ children }: { children: React.ReactNode }) => children,
+  useWebSocket: () => mockWebSocketValue,
+  __esModule: true
+}));
+
 // Mock the AuthContext to avoid dependency issues
 jest.mock('../services/AuthContext', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-provider">{children}</div>,
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
   useAuth: jest.fn().mockReturnValue({
     isLoggedIn: false,
     login: jest.fn(),
     logout: jest.fn(),
     token: '',
     user: null,
-    isAdmin: false
+    isAdmin: false,
+    authState: { isAuthenticated: false, token: null }
   })
 }));
-
-// Mock the WebSocketContext
-jest.mock('../services/WebSocketContext', () => ({
-  WebSocketProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="websocket-provider">{children}</div>,
-  useWebSocket: jest.fn().mockReturnValue({
-    connected: false,
-    sendMessage: jest.fn()
-  })
-}));
-
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import MainWindow from './MainWindow';
 
 // Mock the child components
 jest.mock('./LEDIndicator', () => ({ ledOn }: { ledOn: boolean }) => 
@@ -68,6 +79,20 @@ jest.mock('./VotingControls', () => ({
 jest.mock('./StatusBar', () => ({ message }: { message: string }) => 
   <div data-testid="status-bar">{message}</div>
 );
+jest.mock('./LoginDialog', () => ({ 
+  isVisible, 
+  onCancel,
+  onSubmit
+}: {
+  isVisible: boolean,
+  onCancel: () => void,
+  onSubmit: (username: string, password: string) => void
+}) => (
+  <div data-testid="login-dialog">
+    <button onClick={() => onSubmit('username', 'password')}>Login</button>
+    <button onClick={onCancel}>Cancel</button>
+  </div>
+));
 
 // Mock services
 jest.mock('../services/api', () => ({
@@ -89,8 +114,8 @@ jest.mock('../services/api', () => ({
     getGroupById: jest.fn()
   }
 }));
-jest.mock('../services/websocket.service', () => ({
-  websocketService: {
+jest.mock('../services/socketio.service', () => ({
+  socketIOService: {
     connect: jest.fn().mockResolvedValue(true),
     disconnect: jest.fn(),
     isConnected: jest.fn().mockReturnValue(false),
