@@ -206,6 +206,9 @@ async function announceRestaurantSelection(
     // Emit to the group room
     socketIOServer.to(`group_${groupId}`).emit('group_announcement', message);
     
+    // Also emit as restaurant_selection event to trigger client popups
+    socketIOServer.to(`group_${groupId}`).emit('restaurant_selection', message);
+    
     // Also send as a group message for clients that might not handle announcements
     socketIOServer.to(`group_${groupId}`).emit('group_message', {
       groupId: groupId,

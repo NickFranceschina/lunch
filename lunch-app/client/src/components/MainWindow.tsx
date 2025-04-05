@@ -59,6 +59,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   // Chat state
   const [showUserChat, setShowUserChat] = useState<boolean>(initialUserChatVisible);
   const [showGroupChat, setShowGroupChat] = useState<boolean>(initialGroupChatVisible);
+  const [showHelpWindow, setShowHelpWindow] = useState<boolean>(false);
   const [chatWithUser, setChatWithUser] = useState<User | null>(null);
   const [groupChatData, setGroupChatData] = useState<Group | null>(null);
   const [pendingGroupMessage, setPendingGroupMessage] = useState<any>(null);
@@ -74,6 +75,9 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
 
   // Get the WebSocketContext
   const { isConnected, sendMessage, addMessageListener } = useWebSocket();
+
+  // Track active/foreground window
+  const [activeWindow, setActiveWindow] = useState<string>('');
 
   // Handle toggle functions
   const handleRestaurantPanelToggle = () => {
@@ -803,6 +807,69 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       showStatusMessage('Failed to request random restaurant. Please try again.', 3000);
     }
   };
+
+  // Effect to listen for restaurant notifications
+  useEffect(() => {
+    if (!isLoggedIn) {
+      return;
+    }
+    
+    // Function to handle restaurant notification events
+    const handleRestaurantNotification = (event: any) => {
+      console.log('Received restaurant notification event:', event.detail);
+      
+      // Update restaurant name
+      if (event.detail.restaurant && event.detail.restaurant.name) {
+        setRestaurantName(event.detail.restaurant.name);
+      }
+      
+      // Update confirmation status
+      if (event.detail.isConfirmed !== undefined) {
+        setConfirmed(event.detail.isConfirmed);
+      }
+      
+      // Show notification in status bar
+      showStatusMessage(`Lunch selected: ${event.detail.restaurant.name}!`, 5000);
+    };
+    
+    // Add event listener
+    window.addEventListener('restaurant_notification', handleRestaurantNotification);
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('restaurant_notification', handleRestaurantNotification);
+    };
+  }, [isLoggedIn]);
+  
+  // Listen for close restaurant panel events
+  useEffect(() => {
+    const handleCloseRestaurantPanel = () => {
+      console.log('Received close restaurant panel event');
+      if (showRestaurantPanel) {
+        setShowRestaurantPanel(false);
+      }
+    };
+    
+    window.addEventListener('close:restaurant_panel', handleCloseRestaurantPanel);
+    
+    return () => {
+      window.removeEventListener('close:restaurant_panel', handleCloseRestaurantPanel);
+    };
+  }, [showRestaurantPanel]);
+
+  // Request notification permission on login
+  useEffect(() => {
+    if (isLoggedIn && 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      // Request permission for notifications
+      Notification.requestPermission()
+        .then(permission => {
+          console.log('Notification permission:', permission);
+        })
+        .catch(error => {
+          console.error('Error requesting notification permission:', error);
+        });
+    }
+  }, [isLoggedIn]);
 
   return isVisible && isInitialized ? (
     <div className="main-window-container">

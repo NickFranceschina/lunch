@@ -145,17 +145,23 @@ class SocketIOService {
         // Add listeners for restaurant selections and votes
         this.socket.on('restaurant_selection', (data) => {
           console.log('Received restaurant selection:', data);
+          // Show notification popup
+          this.showRestaurantNotification(data);
           this.triggerMessageListeners('restaurant_selection', data);
         });
 
         this.socket.on('restaurant', (data) => {
           console.log('Received restaurant event:', data);
+          // Show notification popup
+          this.showRestaurantNotification(data);
           // Also trigger restaurant_selection listeners with this data
           this.triggerMessageListeners('restaurant_selection', data);
         });
 
         this.socket.on('random', (data) => {
           console.log('Received random event:', data);
+          // Show notification popup
+          this.showRestaurantNotification(data);
           // Also trigger restaurant_selection listeners with this data
           this.triggerMessageListeners('restaurant_selection', data);
         });
@@ -344,6 +350,46 @@ class SocketIOService {
       this.socket.emit('request_random', { groupId });
     } else {
       console.error('Cannot request random restaurant, socket not connected');
+    }
+  }
+
+  /**
+   * Show a popup notification for restaurant selection
+   * @param data Restaurant selection data
+   */
+  private showRestaurantNotification(data: any): void {
+    if (!data || !data.restaurant) {
+      return;
+    }
+
+    // Ensure the restaurant panel doesn't automatically open
+    sessionStorage.setItem('window_visibility_restaurant', 'false');
+    
+    // Dispatch a custom event that the app can listen for
+    const event = new CustomEvent('restaurant_notification', { 
+      detail: data 
+    });
+    window.dispatchEvent(event);
+    
+    // Dispatch a lunch:time event to make the main window pop up
+    const lunchTimeEvent = new CustomEvent('lunch:time', {
+      detail: { 
+        timestamp: new Date().toISOString(),
+        restaurant: data.restaurant
+      }
+    });
+    window.dispatchEvent(lunchTimeEvent);
+    
+    // If browser notifications are supported and permitted, show one
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const title = 'Lunch Time!';
+      const options = {
+        body: `Today's lunch: ${data.restaurant.name}`,
+        icon: '/favicon.ico',
+        tag: 'lunch-notification'
+      };
+      
+      new Notification(title, options);
     }
   }
 }

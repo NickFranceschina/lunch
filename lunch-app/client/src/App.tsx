@@ -29,6 +29,23 @@ function App() {
       if (!isMainWindowVisible) {
         setIsMainWindowVisible(true);
       }
+      
+      // Try to bring the window to focus if minimized
+      try {
+        // Focus the window if the browser allows it
+        window.focus();
+        
+        // Play a notification sound if available
+        const notificationSound = new Audio('/sounds/notification.mp3');
+        notificationSound.play().catch(e => console.log('Could not play notification sound', e));
+        
+        // Explicitly ensure restaurant panel doesn't show
+        // Dispatch an event that MainWindow will listen for
+        const closeRestaurantPanelEvent = new CustomEvent('close:restaurant_panel');
+        window.dispatchEvent(closeRestaurantPanelEvent);
+      } catch (error) {
+        console.error('Error focusing window:', error);
+      }
     };
 
     // Add event listener with type assertion
