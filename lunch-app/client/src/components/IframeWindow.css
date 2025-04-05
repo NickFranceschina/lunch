@@ -7,6 +7,9 @@
   flex-direction: column;
   font-family: "MS Sans Serif", Arial, sans-serif;
   z-index: 1000;
+  position: relative;
+  min-width: 300px;
+  min-height: 200px;
 }
 
 .iframe-window .title-bar {
@@ -67,4 +70,30 @@
   height: 100%;
   border: none;
   display: block;
+}
+
+/* Resize handle */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  background-image: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 50%,
+    #808080 50%,
+    #808080 60%,
+    transparent 60%,
+    transparent 70%,
+    #808080 70%,
+    #808080 80%,
+    transparent 80%,
+    transparent 90%,
+    #808080 90%,
+    #808080 100%
+  );
+  z-index: 10;
 } 
