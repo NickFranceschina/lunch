@@ -13,7 +13,10 @@ const Win98Taskbar: React.FC<Win98TaskbarProps> = ({
   toggleHelpWindowVisibility,
   toggleShutdownDialog
 }) => {
-  const [currentTime, setCurrentTime] = useState<string>('');
+  const [hours, setHours] = useState<string>('00');
+  const [minutes, setMinutes] = useState<string>('00');
+  const [seconds, setSeconds] = useState<string>('00');
+  const [ampm, setAmPm] = useState<string>('AM');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const startMenuRef = useRef<HTMLDivElement>(null);
   const startButtonRef = useRef<HTMLButtonElement>(null);
@@ -66,15 +69,22 @@ const Win98Taskbar: React.FC<Win98TaskbarProps> = ({
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
-      const hours = now.getHours().toString().padStart(2, '0');
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      setCurrentTime(`${hours}:${minutes}`);
+      
+      // Get hours in 12-hour format
+      const hours24 = now.getHours();
+      const hours12 = hours24 % 12 || 12; // Convert 0 to 12 for midnight
+      const isAM = hours24 < 12;
+      
+      setHours(hours12.toString().padStart(2, '0'));
+      setMinutes(now.getMinutes().toString().padStart(2, '0'));
+      setSeconds(now.getSeconds().toString().padStart(2, '0'));
+      setAmPm(isAM ? 'AM' : 'PM');
     };
     
     // Update immediately
     updateClock();
     
-    // Set interval for updates - check every second to ensure minute changes are caught promptly
+    // Set interval for updates every second
     const interval = setInterval(updateClock, 1000);
     
     // Clean up interval on unmount
@@ -247,7 +257,9 @@ const Win98Taskbar: React.FC<Win98TaskbarProps> = ({
           <img src="/favicon.ico" alt="Lunch App" width="20" height="20" />
         </div>
         <div className="win98-tray-clock">
-          {currentTime}
+          <span style={{ fontFamily: 'Consolas, monospace', fontSize: '12px' }}>
+            {hours}:{minutes}:{seconds} {ampm}
+          </span>
         </div>
       </div>
     </div>

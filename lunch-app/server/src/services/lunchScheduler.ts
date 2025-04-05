@@ -26,7 +26,7 @@ export function initLunchScheduler(): void {
   lunchTimeJob = new CronJob(
     `0 * * * * 1-5`, // Run every minute, Monday-Friday
     async function() {
-      console.log(`Lunch time check triggered at ${new Date().toLocaleString()}`);
+      console.log(`Lunch time check triggered at ${new Date().toISOString()} (UTC)`);
       
       if (global.socketIOServer) {
         try {
@@ -49,7 +49,7 @@ export function initLunchScheduler(): void {
   
   // Start the cron job aligned with the global minute
   setTimeout(() => {
-    console.log(`Starting lunch scheduler aligned with global minute at ${new Date().toLocaleString()}`);
+    console.log(`Starting lunch scheduler aligned with global minute at ${new Date().toISOString()} (UTC)`);
     lunchTimeJob?.start();
     console.log(`Lunch scheduler initialized. Next run at: ${lunchTimeJob?.nextDates()}`);
   }, delayMs);
@@ -107,14 +107,64 @@ async function checkAllGroupLunchTimes(socketIOServer: any): Promise<void> {
       const nowUtcHours = nowUtc.getUTCHours();
       const nowUtcMinutes = nowUtc.getUTCMinutes();
       
-      // Convert notification time to UTC based on timezone offset
-      // (This is simplified - you'd need to calculate the actual offset for the timezone)
-      const timezoneOffsetHours = -6; // For your -6 timezone
+      // Calculate timezone offset based on the timezone
+      let timezoneOffsetHours = 0; // Default to UTC
+      
+      // Map common timezones to their UTC offsets
+      switch(timezone) {
+        case 'America/New_York':
+        case 'EST': 
+          timezoneOffsetHours = -5; 
+          break;
+        case 'EDT': 
+          timezoneOffsetHours = -4; 
+          break;
+        case 'America/Chicago':
+        case 'CST': 
+          timezoneOffsetHours = -6; 
+          break;
+        case 'CDT': 
+          timezoneOffsetHours = -5; 
+          break;
+        case 'America/Denver':
+        case 'MST': 
+          timezoneOffsetHours = -7; 
+          break;
+        case 'MDT': 
+          timezoneOffsetHours = -6; 
+          break;
+        case 'America/Los_Angeles':
+        case 'PST': 
+          timezoneOffsetHours = -8; 
+          break;
+        case 'PDT': 
+          timezoneOffsetHours = -7; 
+          break;
+        // Add more timezone mappings as needed
+        default:
+          // For any other timezone, try to extract a numerical offset if it contains +/- format
+          if (timezone.includes('+')) {
+            const offsetStr = timezone.split('+')[1].split(':')[0];
+            timezoneOffsetHours = parseInt(offsetStr, 10);
+          } else if (timezone.includes('-')) {
+            const offsetStr = timezone.split('-')[1].split(':')[0];
+            timezoneOffsetHours = -parseInt(offsetStr, 10);
+          }
+          // Otherwise keep it as UTC (0)
+      }
+      
+      console.log(`Group ${group.name} notification time: ${notificationHour}:${String(notificationMinute).padStart(2, '0')} ${notificationHour >= 12 ? 'PM' : 'AM'} (${timezone}), current UTC time: ${nowUtcHours}:${String(nowUtcMinutes).padStart(2, '0')} ${nowUtcHours >= 12 ? 'PM' : 'AM'} (UTC)`);
+      
+      // Convert notification time to UTC
       const notificationTimeUTCHours = (notificationHour - timezoneOffsetHours + 24) % 24;
+      const notificationHourDisplay = notificationHour % 12 === 0 ? 12 : notificationHour % 12;
+      const notificationUTCHourDisplay = notificationTimeUTCHours % 12 === 0 ? 12 : notificationTimeUTCHours % 12;
+      
+      console.log(`Group ${group.name}: Local time ${notificationHourDisplay}:${String(notificationMinute).padStart(2, '0')} ${notificationHour >= 12 ? 'PM' : 'AM'} (${timezone}) converts to UTC ${notificationUTCHourDisplay}:${String(notificationMinute).padStart(2, '0')} ${notificationTimeUTCHours >= 12 ? 'PM' : 'AM'} (offset: ${timezoneOffsetHours}h)`);
       
       // Then compare
       if (nowUtcHours === notificationTimeUTCHours && nowUtcMinutes === notificationMinute) {
-        console.log(`It's lunch time for group "${group.name}"! Selecting restaurant...`);
+        console.log(`LUNCH TIME MATCH! Group "${group.name}" at ${new Date().toISOString()} (UTC) - Selecting restaurant...`);
         await lunchTimeCheck(socketIOServer, group.id);
       }
     }
@@ -133,7 +183,7 @@ export async function lunchTimeCheck(socketIOServer: any, groupId?: number): Pro
       return;
     }
 
-    console.log(`Running lunch time check for group ID: ${groupId || 'all'}`);
+    console.log(`Running lunch time check for group ID: ${groupId || 'all'} at ${new Date().toISOString()} (UTC)`);
     const groupRepository = AppDataSource.getRepository(Group);
     
     // Get all groups or a specific group
@@ -146,7 +196,7 @@ export async function lunchTimeCheck(socketIOServer: any, groupId?: number): Pro
     }
 
     for (const group of groups) {
-      console.log(`Processing lunch time for group: ${group.name} (ID: ${group.id})`);
+      console.log(`Processing lunch time for group: ${group.name} (ID: ${group.id}) at ${new Date().toISOString()} (UTC)`);
       
       try {
         // Get group restaurants with votes
@@ -198,7 +248,7 @@ export async function lunchTimeCheck(socketIOServer: any, groupId?: number): Pro
       }
     }
     
-    console.log('Lunch time check completed');
+    console.log('Lunch time check completed at ' + new Date().toISOString() + ' (UTC)');
   } catch (error) {
     console.error('Error in lunchTimeCheck:', error);
     throw error;
@@ -306,7 +356,7 @@ async function announceRestaurantSelection(
       messageId: `lunch_${Date.now()}`
     });
     
-    console.log(`Announced restaurant selection to group ${groupId}: ${restaurant.name}`);
+    console.log(`Announced restaurant selection to group ${groupId}: ${restaurant.name} at ${new Date().toISOString()} (UTC)`);
   } catch (error) {
     console.error(`Error announcing restaurant selection to group ${groupId}:`, error);
   }
@@ -317,7 +367,7 @@ async function announceRestaurantSelection(
  */
 export async function resyncLunchScheduler(socketIOServer: any): Promise<void> {
   try {
-    console.log('Resynchronizing lunch scheduler...');
+    console.log('Resynchronizing lunch scheduler at ' + new Date().toISOString() + ' (UTC)');
     
     // Stop any existing job
     if (lunchTimeJob) {
@@ -328,7 +378,7 @@ export async function resyncLunchScheduler(socketIOServer: any): Promise<void> {
     // Re-initialize the scheduler
     initLunchScheduler();
     
-    console.log('Lunch scheduler resynced successfully');
+    console.log('Lunch scheduler resynced successfully at ' + new Date().toISOString() + ' (UTC)');
   } catch (error) {
     console.error('Error resynchronizing lunch scheduler:', error);
     throw error;

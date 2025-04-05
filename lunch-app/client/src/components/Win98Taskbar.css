@@ -90,14 +90,20 @@
 }
 
 .win98-tray-clock {
-  min-width: 60px;
-  padding: 1px 5px;
+  min-width: 90px !important;
+  width: auto !important;
+  padding: 1px 8px !important;
   height: 20px;
   margin: 2px;
   background-color: #c0c0c0;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: 'Consolas', 'Courier New', monospace !important;
+  font-size: 12px !important;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: visible !important;
 }
 
 /* Start Menu Styles */

@@ -1,0 +1,16 @@
+services:
+  lunch-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lunch-app
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3001}:3001"
+    volumes:
+      - ./database:/app/database
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3001}
+      - JWT_SECRET=${JWT_SECRET:-lunch-app-secret-key-dev-only}
+      - TZ=UTC 

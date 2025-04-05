@@ -3,6 +3,7 @@ import { groupService, userService, systemService, restaurantService } from '../
 import './GroupPanel.css';
 import './Win98Panel.css';
 import useDraggable from '../hooks/useDraggable';
+import { DateTime } from 'luxon';
 
 interface User {
   id: number;
@@ -167,6 +168,16 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
   const [occurrenceRating, setOccurrenceRating] = useState<string>('sometimes');
   
+  // Add state for countdown timer
+  const [upcomingNotification, setUpcomingNotification] = useState<{
+    estTime: string;
+    utcTime: string;
+    tzAbbr: string;
+    countdown: string;
+    minutesUntil: number;
+    secondsUntil: number;
+  } | null>(null);
+  
   // Use position in the center of the screen
   const initialPosition = {
     x: Math.max(0, (window.innerWidth - 700) / 2), // 700px is approximate panel width
@@ -290,6 +301,11 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     };
     setFormData(newFormData);
     checkForChanges(newFormData);
+    
+    // Immediately recalculate upcoming notification if relevant fields changed
+    if (name === 'notificationTime' || name === 'timezone') {
+      calculateTimeUntilNotification();
+    }
   };
 
   // Check if form data has changed from the original group data
@@ -569,6 +585,146 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     }
   };
 
+  // Calculate time until next notification
+  const calculateTimeUntilNotification = useCallback(() => {
+    const notificationTimeToUse = formData.notificationTime; 
+    const timezoneToUse = formData.timezone;
+                                  
+    if (!notificationTimeToUse) {
+      setUpcomingNotification(null);
+      return;
+    }
+
+    try {
+      // Parse notification time
+      const [hours, minutes] = notificationTimeToUse.split(':').map(num => parseInt(num, 10));
+      
+      // Create a DateTime object for the notification time in the specified timezone
+      const notificationTime = DateTime.now().setZone(timezoneToUse).set({
+        hour: hours,
+        minute: minutes,
+        second: 0,
+        millisecond: 0
+      });
+      
+      // If the notification time is in the past (earlier today), add a day
+      let targetNotificationTime = notificationTime;
+      if (targetNotificationTime < DateTime.now()) {
+        targetNotificationTime = targetNotificationTime.plus({ days: 1 });
+      }
+      
+      // Calculate difference between now and the notification time
+      const diff = targetNotificationTime.diff(DateTime.now(), ['hours', 'minutes', 'seconds']);
+      
+      // Get the UTC time
+      const utcTime = targetNotificationTime.toUTC();
+      
+      // Format times for display
+      const localTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      const utcTimeStr = utcTime.toFormat('HH:mm');
+      const tzAbbr = getTimezoneAbbreviation(timezoneToUse);
+      
+      // Format countdown
+      const hoursUntil = Math.floor(diff.hours);
+      const minsUntil = Math.floor(diff.minutes);
+      const secsUntil = Math.floor(diff.seconds);
+      const countdownStr = `in ${hoursUntil}h ${minsUntil}m ${secsUntil}s`;
+      
+      // Calculate total seconds and minutes for the interface
+      const totalSeconds = hoursUntil * 3600 + minsUntil * 60 + secsUntil;
+      const totalMinutes = Math.floor(totalSeconds / 60);
+      
+      setUpcomingNotification({
+        estTime: localTimeStr,
+        utcTime: utcTimeStr,
+        tzAbbr: tzAbbr,
+        countdown: countdownStr,
+        minutesUntil: totalMinutes,
+        secondsUntil: totalSeconds
+      });
+    } catch (error) {
+      console.error('Error calculating notification time:', error);
+      setUpcomingNotification(null);
+    }
+  }, [formData.notificationTime, formData.timezone]);
+
+  // Get timezone offset in hours from UTC
+  const getTimezoneOffset = (timezoneValue: string): number => {
+    const timezone = timezones.find(tz => tz.value === timezoneValue);
+    if (!timezone) return 0;
+    
+    // Parse the offset from format like "UTC-5" or "UTC+2"
+    const offsetStr = timezone.offset;
+    const offsetMatch = offsetStr.match(/UTC([+-])(\d+)(?::(\d+))?/);
+    
+    if (!offsetMatch) return 0;
+    
+    const sign = offsetMatch[1] === '-' ? -1 : 1;
+    const hours = parseInt(offsetMatch[2], 10) || 0;
+    const minutes = parseInt(offsetMatch[3], 10) || 0;
+    
+    return sign * (hours + minutes / 60);
+  };
+  
+  // Get timezone abbreviation
+  const getTimezoneAbbreviation = (timezoneValue: string): string => {
+    const timezone = timezones.find(tz => tz.value === timezoneValue);
+    if (!timezone) return 'UTC';
+    
+    // For common timezones, return well-known abbreviations
+    switch (timezoneValue) {
+      // North America
+      case 'America/New_York': return 'EST';
+      case 'America/Chicago': return 'CST';
+      case 'America/Denver': return 'MST';
+      case 'America/Los_Angeles': return 'PST';
+      case 'America/Phoenix': return 'MST';
+      case 'America/Anchorage': return 'AKST';
+      case 'Pacific/Honolulu': return 'HST';
+      
+      // Europe
+      case 'Europe/London': return 'GMT';
+      case 'Europe/Paris': return 'CET';
+      case 'Europe/Berlin': return 'CET';
+      case 'Europe/Rome': return 'CET';
+      case 'Europe/Helsinki': return 'EET';
+      case 'Europe/Moscow': return 'MSK';
+      
+      // Asia
+      case 'Asia/Tokyo': return 'JST';
+      case 'Asia/Shanghai': return 'CST';
+      case 'Asia/Singapore': return 'SGT';
+      case 'Asia/Kolkata': return 'IST';
+      case 'Asia/Dubai': return 'GST';
+      
+      // Australia
+      case 'Australia/Sydney': return 'AEST';
+      case 'Australia/Perth': return 'AWST';
+      
+      // UTC
+      case 'UTC': return 'UTC';
+      
+      // Default to offset if no specific abbreviation
+      default:
+        // Extract offset from format like "UTC-5" or "UTC+2"
+        const offsetStr = timezone.offset;
+        const offsetMatch = offsetStr.match(/UTC([+-]\d+(?::\d+)?)/);
+        return offsetMatch ? offsetMatch[1] : timezone.offset.replace('UTC', '');
+    }
+  };
+
+  // Update countdown every second
+  useEffect(() => {
+    calculateTimeUntilNotification();
+    
+    // Update every second
+    const interval = setInterval(() => {
+      calculateTimeUntilNotification();
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [calculateTimeUntilNotification]);
+
   // Check if user is in group
   const isUserInGroup = (group: Group) => {
     return group.users?.some(user => user.id === currentUserId) || false;
@@ -813,6 +969,14 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                           </span>
                         )}
                       </div>
+                      {upcomingNotification && (
+                        <div className="win98-form-row" style={{ marginTop: '-5px', marginBottom: '5px' }}>
+                          <label className="win98-label">Upcoming:</label>
+                          <div style={{ fontSize: '12px' }}>
+                            {upcomingNotification.estTime} {upcomingNotification.tzAbbr} / {upcomingNotification.utcTime} UTC - {upcomingNotification.countdown}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="win98-panel-footer">
@@ -907,6 +1071,15 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                             </div>
                           </div>
                           
+                          {upcomingNotification && (
+                            <div className="win98-form-row" style={{ marginTop: '-5px', marginBottom: '5px' }}>
+                              <label className="win98-label">Upcoming:</label>
+                              <div style={{ fontSize: '12px' }}>
+                                {upcomingNotification.estTime} {upcomingNotification.tzAbbr} / {upcomingNotification.utcTime} UTC - {upcomingNotification.countdown}
+                              </div>
+                            </div>
+                          )}
+                          
                           <div className="win98-form-row">
                             <label className="win98-label">Current Restaurant:</label>
                             <span>
@@ -953,6 +1126,15 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                               )}
                             </span>
                           </div>
+                          
+                          {upcomingNotification && (
+                            <div className="win98-form-row" style={{ marginTop: '-5px', marginBottom: '5px' }}>
+                              <span className="win98-label">Upcoming:</span>
+                              <span style={{ fontSize: '12px' }}>
+                                {upcomingNotification.estTime} {upcomingNotification.tzAbbr} / {upcomingNotification.utcTime} UTC - {upcomingNotification.countdown}
+                              </span>
+                            </div>
+                          )}
                           
                           <div className="win98-form-row">
                             <span className="win98-label">Current Restaurant:</span>
