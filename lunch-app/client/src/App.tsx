@@ -12,8 +12,8 @@ import { AuthProvider } from './services/AuthContext';
 import { WebSocketProvider } from './services/WebSocketContext';
 
 function App() {
-  // Read initial visibility state from sessionStorage, default to true if not found
-  const initialVisibility = sessionStorage.getItem('window_visibility_main') === 'false' ? false : true;
+  // Read initial visibility state from sessionStorage, default to false if not found
+  const initialVisibility = sessionStorage.getItem('window_visibility_main') === 'true' ? true : false;
   const initialHelpVisibility = sessionStorage.getItem('window_visibility_help') === 'true';
   const [isMainWindowVisible, setIsMainWindowVisible] = useState<boolean>(initialVisibility);
   const [isHelpWindowVisible, setIsHelpWindowVisible] = useState<boolean>(initialHelpVisibility);

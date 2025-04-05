@@ -20,7 +20,7 @@ const HelpIcon: React.FC<HelpIconProps> = ({ onClick }) => {
           <text x="22" y="22" fontSize="4" fill="white" textAnchor="middle" dominantBaseline="middle">?</text>
         </svg>
       </div>
-      <div className="icon-label">Help</div>
+      <div className="icon-label">Lunch Help</div>
     </div>
   );
 };
