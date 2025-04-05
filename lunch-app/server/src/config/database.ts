@@ -33,5 +33,5 @@ export const AppDataSource = new DataSource({
     logging: !isProduction, // Enable logging only in development
     entities: [User, Group, Restaurant, GroupRestaurant, Chat, Setting],
     subscribers: [],
-    migrations: [],
+    migrations: [path.join(__dirname, "..", "migrations", "*.{ts,js}")],
 }); 

@@ -279,6 +279,7 @@ export const groupService = {
   },
   
   createGroup: async (data: any, token: string) => {
+    // Make sure the timezone field is included in the data
     const response = await fetch(`${API_BASE_URL}/api/groups`, {
       method: 'POST',
       headers: {
@@ -296,6 +297,7 @@ export const groupService = {
   },
   
   updateGroup: async (id: number, data: any, token: string) => {
+    // Make sure the timezone field is included in the data
     const response = await fetch(`${API_BASE_URL}/api/groups/${id}`, {
       method: 'PUT',
       headers: {
@@ -460,30 +462,31 @@ export const userService = {
     return response.json();
   },
   
-  getCurrentUser: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-      method: 'GET',
+  createUser: async (userData: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/users`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
+      body: JSON.stringify(userData),
     });
     
     if (!response.ok) {
-      throw new Error('Failed to get current user');
+      throw new Error('Failed to create user');
     }
     
     return response.json();
   },
   
-  updateUser: async (id: number, data: any, token: string) => {
+  updateUser: async (id: number, userData: any, token: string) => {
     const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(userData),
     });
     
     if (!response.ok) {
@@ -529,4 +532,4 @@ export const systemService = {
       };
     }
   }
-}; 
+};

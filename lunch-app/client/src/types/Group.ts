@@ -3,6 +3,7 @@ export interface Group {
   name: string;
   description?: string;
   notificationTime?: string;
+  timezone?: string;
   users?: { id: number; username: string }[];
   currentRestaurant?: any;
   isConfirmed?: boolean;

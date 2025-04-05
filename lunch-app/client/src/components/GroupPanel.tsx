@@ -15,6 +15,7 @@ interface Group {
   name: string;
   description?: string;
   notificationTime?: string;
+  timezone?: string;
   currentRestaurant?: {
     id: number;
     name: string;
@@ -40,7 +41,35 @@ interface GroupFormData {
   name: string;
   description: string;
   notificationTime: string; // Assuming HH:MM format
+  timezone: string;
 }
+
+// Define common timezones
+interface Timezone {
+  value: string;
+  label: string;
+  offset: string;
+}
+
+const timezones: Timezone[] = [
+  { value: 'UTC', label: 'Coordinated Universal Time', offset: 'UTC+0' },
+  { value: 'America/New_York', label: 'Eastern Time (US & Canada)', offset: 'UTC-5' },
+  { value: 'America/Chicago', label: 'Central Time (US & Canada)', offset: 'UTC-6' },
+  { value: 'America/Denver', label: 'Mountain Time (US & Canada)', offset: 'UTC-7' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)', offset: 'UTC-8' },
+  { value: 'America/Anchorage', label: 'Alaska (US)', offset: 'UTC-9' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii (US)', offset: 'UTC-10' },
+  { value: 'Europe/London', label: 'London, Dublin, Lisbon', offset: 'UTC+0' },
+  { value: 'Europe/Paris', label: 'Paris, Berlin, Rome, Madrid', offset: 'UTC+1' },
+  { value: 'Europe/Helsinki', label: 'Helsinki, Kyiv, Riga, Sofia', offset: 'UTC+2' },
+  { value: 'Europe/Moscow', label: 'Moscow, St. Petersburg', offset: 'UTC+3' },
+  { value: 'Asia/Dubai', label: 'Dubai, Abu Dhabi', offset: 'UTC+4' },
+  { value: 'Asia/Kolkata', label: 'Mumbai, New Delhi', offset: 'UTC+5:30' },
+  { value: 'Asia/Shanghai', label: 'Beijing, Shanghai, Singapore', offset: 'UTC+8' },
+  { value: 'Asia/Tokyo', label: 'Tokyo, Seoul, Osaka', offset: 'UTC+9' },
+  { value: 'Australia/Sydney', label: 'Sydney, Melbourne', offset: 'UTC+10' },
+  { value: 'Pacific/Auckland', label: 'Auckland, Wellington', offset: 'UTC+12' },
+];
 
 const GroupPanel: React.FC<GroupPanelProps> = ({
   isVisible,
@@ -57,10 +86,11 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<GroupFormData>({
-    id: null, // Initialize id as null
+    id: null,
     name: '',
     description: '',
-    notificationTime: '12:00' // Default time
+    notificationTime: '12:00', // Default time
+    timezone: 'UTC' // Default timezone
   });
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showUserSelector, setShowUserSelector] = useState<boolean>(false);
@@ -205,6 +235,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     
     const hasNameChange = newFormData.name !== selectedGroup.name;
     const hasDescriptionChange = newFormData.description !== (selectedGroup.description || '');
+    const hasTimezoneChange = newFormData.timezone !== (selectedGroup.timezone || 'UTC');
     
     // Format time for comparison
     let originalTime = "12:00";
@@ -225,7 +256,7 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
     
     const hasTimeChange = newFormData.notificationTime !== originalTime;
 
-    setHasChanges(hasNameChange || hasDescriptionChange || hasTimeChange);
+    setHasChanges(hasNameChange || hasDescriptionChange || hasTimeChange || hasTimezoneChange);
   };
 
   // Handle user selection change
@@ -258,12 +289,14 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       id: group.id,
       name: group.name,
       description: group.description || '',
-      notificationTime: timeString
+      notificationTime: timeString,
+      timezone: group.timezone || 'UTC'
     });
     
     setShowUserSelector(false);
     setShowAddForm(false);
     setHasChanges(false);
+    setShowTimezonePicker(false);
     
     // Fetch group restaurants when a group is selected
     fetchGroupRestaurants(group.id);
@@ -306,7 +339,8 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       await groupService.updateGroup(selectedGroup.id, {
         name: formData.name,
         description: formData.description,
-        notificationTime: formData.notificationTime
+        notificationTime: formData.notificationTime,
+        timezone: formData.timezone
       }, token);
 
       await fetchGroups();
@@ -448,7 +482,8 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       id: null,
       name: '',
       description: '',
-      notificationTime: '12:00'
+      notificationTime: '12:00',
+      timezone: 'UTC'
     });
     setSelectedGroup(null);
     setShowAddForm(true);
@@ -468,7 +503,8 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       id: null,
       name: '',
       description: '',
-      notificationTime: '12:00'
+      notificationTime: '12:00',
+      timezone: 'UTC'
     });
     setHasChanges(false);
     setShowAddForm(false);
@@ -549,6 +585,26 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
       setLoading(false);
     }
   };
+
+  // Get the short timezone offset
+  const getTimezoneShortOffset = (timezoneValue: string) => {
+    const timezone = timezones.find(tz => tz.value === timezoneValue);
+    return timezone ? timezone.offset : 'UTC';
+  };
+
+  // Select timezone and close picker
+  const handleTimezoneSelect = (timezoneValue: string) => {
+    const newFormData = {
+      ...formData,
+      timezone: timezoneValue
+    };
+    setFormData(newFormData);
+    setShowTimezonePicker(false);
+    checkForChanges(newFormData);
+  };
+
+  // Add the state variable for the timezone picker
+  const [showTimezonePicker, setShowTimezonePicker] = useState<boolean>(false);
 
   if (!isVisible) return null;
 
@@ -652,9 +708,10 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                         {serverTimezone && (
                           <span 
                             className="timezone-label" 
-                            title={serverTimezone.name || serverTimezone.offsetString}
+                            onClick={() => setShowTimezonePicker(true)}
+                            title="Click to change timezone"
                           >
-                            ({serverTimezone.shortOffset})
+                            ({getTimezoneShortOffset(formData.timezone)})
                           </span>
                         )}
                       </div>
@@ -743,9 +800,10 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                               {serverTimezone && (
                                 <span 
                                   className="timezone-label" 
-                                  title={serverTimezone.name || serverTimezone.offsetString}
+                                  onClick={() => setShowTimezonePicker(true)}
+                                  title="Click to change timezone"
                                 >
-                                  ({serverTimezone.shortOffset})
+                                  ({getTimezoneShortOffset(formData.timezone)})
                                 </span>
                               )}
                             </div>
@@ -790,9 +848,9 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
                               {serverTimezone && (
                                 <span 
                                   className="timezone-label"
-                                  title={serverTimezone.name || serverTimezone.offsetString}
+                                  title={timezones.find(tz => tz.value === (selectedGroup?.timezone || 'UTC'))?.label || 'UTC'}
                                 >
-                                  ({serverTimezone.shortOffset})
+                                  ({getTimezoneShortOffset(selectedGroup?.timezone || 'UTC')})
                                 </span>
                               )}
                             </span>
@@ -1180,6 +1238,29 @@ const GroupPanel: React.FC<GroupPanelProps> = ({
           </div>
         </div>
       </div>
+      {showTimezonePicker && (
+        <div className="timezone-picker">
+          <div className="timezone-picker-content">
+            <div className="timezone-picker-header">
+              <h2>Select Timezone</h2>
+              <button onClick={() => setShowTimezonePicker(false)}>×</button>
+            </div>
+            <div className="timezone-picker-body">
+              <div className="timezone-list">
+                {timezones.map(timezone => (
+                  <div
+                    key={timezone.value}
+                    className={`timezone-item ${formData.timezone === timezone.value ? 'timezone-selected' : ''}`}
+                    onClick={() => handleTimezoneSelect(timezone.value)}
+                  >
+                    <strong>{timezone.offset}</strong> - {timezone.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

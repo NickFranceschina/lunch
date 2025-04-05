@@ -17,6 +17,9 @@ export class Group {
     @Column({ type: 'time', nullable: true })
     notificationTime?: Date;
 
+    @Column({ nullable: true })
+    timezone?: string;
+
     @ManyToOne(() => Restaurant, { nullable: true })
     @JoinColumn()
     currentRestaurant?: Restaurant;

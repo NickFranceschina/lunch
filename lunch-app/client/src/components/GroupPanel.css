@@ -322,9 +322,171 @@
 }
 
 .timezone-label {
-  margin-left: 5px;
-  font-size: 0.8em;
-  color: #777;
+  margin-left: 10px;
+  font-size: 0.9em;
+  color: #000;
   white-space: nowrap;
-  cursor: help;
-} 
+  cursor: pointer;
+  background-color: #c0c0c0;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  padding: 2px 8px;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.timezone-label:after {
+  content: "▼";
+  font-size: 8px;
+  margin-left: 5px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.timezone-label:hover {
+  background-color: #d0d0d0;
+}
+
+/* Timezone picker styling */
+.timezone-picker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.timezone-picker-content {
+  background-color: #c0c0c0;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  width: 450px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+  color: #000;
+}
+
+.timezone-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 4px 3px 6px;
+  background-color: #000080;
+  color: white;
+}
+
+.timezone-picker-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.timezone-picker-header button {
+  background-color: #c0c0c0;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+  color: #000;
+  cursor: pointer;
+  font-size: 14px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 14px;
+  padding: 0;
+}
+
+.timezone-picker-body {
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 60vh;
+  border: 1px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  margin: 6px;
+  background-color: #ffffff;
+}
+
+.timezone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timezone-item {
+  padding: 4px 5px 4px 25px;
+  cursor: pointer;
+  color: #000;
+  border-bottom: 1px solid #ddd;
+  background-color: #ffffff;
+  position: relative;
+}
+
+.timezone-item:before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13px;
+  height: 13px;
+  border: 1px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  background-color: #ffffff;
+}
+
+.timezone-item:hover {
+  background-color: #e8e8e8;
+}
+
+.timezone-selected {
+  background-color: #000080;
+  color: white;
+}
+
+/* Ensure checkbox is still visible when selected */
+.timezone-selected:before {
+  content: "";
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 13 13'%3E%3Cpath d='M2,6 L5,9 L11,3' stroke='black' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  border-color: #000000;
+  background-color: #ffffff;
+}
+
+.win98-form-row {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.win98-form-row .win98-label {
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.win98-form-row input,
+.win98-form-row textarea,
+.win98-form-row select {
+  width: 100%;
+}
+
+.win98-form-row .time-with-timezone {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.win98-form-row .time-with-timezone input {
+  width: 120px;
+}

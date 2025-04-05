@@ -67,7 +67,7 @@ export const getGroupById = async (req: Request, res: Response) => {
  */
 export const createGroup = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, notificationTime } = req.body;
+    const { name, description, notificationTime, timezone } = req.body;
     
     if (!name) {
       return res.status(400).json({
@@ -98,6 +98,7 @@ export const createGroup = async (req: AuthRequest, res: Response) => {
       name,
       description,
       notificationTime: notificationTimeDate,
+      timezone,
       yesVotes: 0,
       noVotes: 0,
       isConfirmed: false
@@ -156,10 +157,11 @@ export const updateGroup = async (req: AuthRequest, res: Response) => {
     }
 
     // Update group fields
-    const { name, description, notificationTime } = req.body;
+    const { name, description, notificationTime, timezone } = req.body;
     
     if (name) group.name = name;
     if (description !== undefined) group.description = description;
+    if (timezone !== undefined) group.timezone = timezone;
     
     // Convert notification time string to Date if provided
     if (notificationTime) {
@@ -183,7 +185,8 @@ export const updateGroup = async (req: AuthRequest, res: Response) => {
           groupId: id,
           name: group.name,
           description: group.description,
-          notificationTime: group.notificationTime
+          notificationTime: group.notificationTime,
+          timezone: group.timezone
         }
       });
       
@@ -192,7 +195,8 @@ export const updateGroup = async (req: AuthRequest, res: Response) => {
         groupId: id,
         name: group.name,
         description: group.description,
-        notificationTime: group.notificationTime
+        notificationTime: group.notificationTime,
+        timezone: group.timezone
       });
     }
 
