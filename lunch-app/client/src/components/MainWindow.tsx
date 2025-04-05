@@ -175,6 +175,8 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
   useEffect(() => {
     let cleanupFunction: (() => void) | undefined;
     let pingInterval: NodeJS.Timeout | undefined;
+    let connectionRetryCount = 0;
+    let connectionRetryTimeout: NodeJS.Timeout | undefined;
     
     if (isLoggedIn && token) {
       console.log("MainWindow - Attempting Socket.IO connection with token:", token.substring(0, 10) + "...");
@@ -188,9 +190,36 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
             setWsConnected(true);
             console.log('MainWindow - Socket.IO connected successfully');
             showStatusMessage('Connected to server');
+            // Reset retry count on successful connection
+            connectionRetryCount = 0;
           } catch (error) {
             console.error('MainWindow - Failed to connect to Socket.IO:', error);
             setWsConnected(false);
+            
+            // Increment retry count
+            connectionRetryCount++;
+            
+            // Show appropriate message based on retry count
+            if (connectionRetryCount === 1) {
+              showStatusMessage('Having trouble connecting to server. Retrying...', 5000);
+            } else if (connectionRetryCount > 3) {
+              showStatusMessage('Connection issues persist. The app will work in limited mode.', 8000);
+            }
+            
+            // Try to reconnect with exponential backoff, but max 3 retries
+            if (connectionRetryCount <= 3) {
+              const delay = Math.min(2000 * Math.pow(2, connectionRetryCount - 1), 8000);
+              console.log(`MainWindow - Will retry connection in ${delay}ms (attempt ${connectionRetryCount})`);
+              
+              if (connectionRetryTimeout) {
+                clearTimeout(connectionRetryTimeout);
+              }
+              
+              connectionRetryTimeout = setTimeout(() => {
+                console.log(`MainWindow - Retrying connection (attempt ${connectionRetryCount})`);
+                ensureConnection();
+              }, delay);
+            }
           }
         } else {
           setWsConnected(true);
@@ -372,6 +401,10 @@ const MainWindow: React.FC<MainWindowProps> = ({ isVisible, toggleVisibility }) 
       
       if (pingInterval) {
         clearInterval(pingInterval);
+      }
+      
+      if (connectionRetryTimeout) {
+        clearTimeout(connectionRetryTimeout);
       }
     };
   }, [isLoggedIn, token, currentGroup, totalUsers]);

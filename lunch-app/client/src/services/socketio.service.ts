@@ -14,6 +14,7 @@ class SocketIOService {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private connectionStatus: boolean = false;
   private apiUrl: string;
+  private connectionAttempts: number = 0;
 
   constructor() {
     // Get API URL from environment or use window location
@@ -34,6 +35,9 @@ class SocketIOService {
    * @param token JWT authentication token
    */
   async connect(token: string): Promise<void> {
+    // Reset connection attempts counter on new connection attempt
+    this.connectionAttempts = 0;
+    
     return new Promise((resolve, reject) => {
       try {
         if (this.socket) {
@@ -49,15 +53,25 @@ class SocketIOService {
           auth: { token },
           query: { token }, // Use query parameter for compatibility
           reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 2000,
-          timeout: 10000,
-          transports: ['websocket', 'polling'] // Try WebSocket first, fallback to polling
+          reconnectionAttempts: 10, // Increased from 5
+          reconnectionDelay: 1000, // Decreased from 2000 for faster retry
+          timeout: 20000, // Increased from 10000 to 20000
+          transports: ['polling', 'websocket'] // Try polling first, then websocket for better compatibility
         });
+
+        // Add connection attempt timeout
+        const connectionTimeout = setTimeout(() => {
+          if (this.socket && !this.socket.connected) {
+            console.warn('Socket.IO connection timeout, falling back to regular API');
+            this.updateConnectionStatus(false);
+            reject(new Error('Connection timeout'));
+          }
+        }, 25000); // Separate timeout for the overall connection process
 
         // Setup connection event handlers
         this.socket.on('connect', () => {
           console.log('Socket.IO connected!');
+          clearTimeout(connectionTimeout);
           this.updateConnectionStatus(true);
           resolve();
         });
@@ -77,14 +91,22 @@ class SocketIOService {
         this.socket.on('connect_error', (error) => {
           console.error('Socket.IO connection error:', error);
           this.updateConnectionStatus(false);
-          reject(error);
+          
+          // Increment connection attempts
+          this.connectionAttempts++;
+          
+          // Don't immediately reject - allow reconnection attempts
+          if (!this.socket?.connected && this.connectionAttempts > 5) {
+            clearTimeout(connectionTimeout);
+            reject(error);
+          }
         });
 
         this.socket.on('disconnect', (reason) => {
           console.log('Socket.IO disconnected. Reason:', reason);
           this.updateConnectionStatus(false);
           
-          // Auto-reconnect after a timeout
+          // Auto-reconnect after a timeout if not rejected
           if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
           }
@@ -94,12 +116,21 @@ class SocketIOService {
             if (this.socket) {
               this.socket.connect();
             }
-          }, 3000);
+          }, 2000);
         });
 
         this.socket.on('error', (error) => {
           console.error('Socket.IO error:', error);
           this.updateConnectionStatus(false);
+          
+          // Increment connection attempts
+          this.connectionAttempts++;
+          
+          // Don't immediately reject - allow reconnection attempts
+          if (!this.socket?.connected && this.connectionAttempts > 5) {
+            clearTimeout(connectionTimeout);
+            reject(error);
+          }
         });
         
         // Handle server messages
